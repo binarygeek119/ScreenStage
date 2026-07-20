@@ -1391,6 +1391,8 @@ async function buildTmdbNowShowingListCards() {
 
 /** Library-style slides: cached poster DB first when enabled; live on-demand only as backup. */
 function buildLibrarySlideDeckFromPosterCache() {
+  // Master ON-DEMAND toggle must gate both live fetches and cache-backed library slides.
+  if (!isOnDemandEnabled) return [];
   if (!preferCachedPostersEnabled()) return odCards;
   const kind = loadedSettings
     ? getMediaServerKind(loadedSettings.mediaServerType)
@@ -1408,7 +1410,7 @@ function buildLibrarySlideDeckFromPosterCache() {
  * Now Playing / on-demand network work finishes (first paint on /posters).
  */
 async function warmCachedPosterDeckEarlyIfPossible() {
-  if (!loadedSettings || !preferCachedPostersEnabled()) return;
+  if (!loadedSettings || !isOnDemandEnabled || !preferCachedPostersEnabled()) return;
   if (!cachedPosterDbHasRows()) return;
   const kind = getMediaServerKind(loadedSettings.mediaServerType);
   const warmCount = Math.min(12, primaryCachedPosterSlideCount());
@@ -3261,7 +3263,7 @@ async function saveReset(formObject) {
   // clear cards
   nsCards = [];
   odCards = [];
-  csrCards = [];
+  csCards = [];
   csrCards = [];
   picCards = [];
   adSlideCards = [];
