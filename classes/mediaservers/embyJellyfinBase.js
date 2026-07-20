@@ -862,6 +862,45 @@ class EmbyJellyfinBase {
     });
   }
 
+  /** Comma-separated include list → trimmed lowercase tokens (allows spaces inside names). */
+  static parseIncludeFilterList(raw) {
+    return String(raw || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  /**
+   * Emby/Jellyfin session display names for user include-filter matching.
+   * Prefer UserName; also match UserId (GUID) if pasted into the filter field.
+   */
+  static sessionUserMatchKeys(session) {
+    const keys = [];
+    const push = (v) => {
+      const s = String(v || "")
+        .trim()
+        .toLowerCase();
+      if (s && !keys.includes(s)) keys.push(s);
+    };
+    push(session && (session.UserName || session.userName));
+    push(session && (session.UserId || session.userId));
+    const extra = (session && (session.AdditionalUsers || session.additionalUsers)) || [];
+    if (Array.isArray(extra)) {
+      for (const u of extra) {
+        push(u && (u.UserName || u.userName));
+        push(u && (u.UserId || u.userId));
+      }
+    }
+    return keys;
+  }
+
+  static sessionMatchesUserFilter(session, wantedUsers) {
+    if (!wantedUsers || wantedUsers.length === 0) return true;
+    const keys = EmbyJellyfinBase.sessionUserMatchKeys(session);
+    if (keys.length === 0) return false;
+    return wantedUsers.some((want) => keys.includes(want));
+  }
+
   static pickStreams(item) {
     const ms = item.MediaSources && item.MediaSources[0];
     if (!ms || !ms.MediaStreams) return { resCodec: "", audioCodec: "" };
@@ -1017,20 +1056,8 @@ class EmbyJellyfinBase {
       return nsCards;
     }
 
-    const devices = (filterDevices || "")
-      .toLowerCase()
-      .replace(/, /g, ",")
-      .replace(/ ,/g, ",")
-      .replace(/,+$/, "")
-      .split(",")
-      .filter(Boolean);
-    const users = (filterUsers || "")
-      .toLowerCase()
-      .replace(/, /g, ",")
-      .replace(/ ,/g, ",")
-      .replace(/,+$/, "")
-      .split(",")
-      .filter(Boolean);
+    const devices = EmbyJellyfinBase.parseIncludeFilterList(filterDevices);
+    const users = EmbyJellyfinBase.parseIncludeFilterList(filterUsers);
 
     const libNameCache = new Map();
     let userIdForLibs = null;
@@ -1385,11 +1412,12 @@ class EmbyJellyfinBase {
         if (wantRemote && medCard.playerLocal === false) okToAdd = true;
         if (wantLocal && medCard.playerLocal === true) okToAdd = true;
       }
-      if (users.length > 0 && users[0] !== "") {
-        const un = (session.UserName || session.userName || "").toLowerCase();
-        if (!users.includes(un)) okToAdd = false;
+      if (users.length > 0) {
+        if (!EmbyJellyfinBase.sessionMatchesUserFilter(session, users)) {
+          okToAdd = false;
+        }
       }
-      if (devices.length > 0 && devices[0] !== "") {
+      if (devices.length > 0) {
         if (!EmbyJellyfinBase.sessionDeviceMatchesFilter(session, medCard.playerDevice, devices)) {
           okToAdd = false;
         }
@@ -1466,13 +1494,27 @@ class EmbyJellyfinBase {
       }
     }
 
+    // Never bypass user/device include-filters with unfiltered sessions. That made
+    // "Filter by user(s)" look broken on Emby/Jellyfin (empty filtered set → show everyone).
     if (nsCards.length === 0 && fallbackCards.length > 0) {
+      const hasIncludeFilter = users.length > 0 || devices.length > 0;
+      if (!hasIncludeFilter) {
+        const now = new Date();
+        console.log(
+          now.toLocaleString() +
+            " *Now Scrn. - All Emby/Jellyfin sessions excluded by local/remote filter; using unfiltered fallback cards"
+        );
+        return fallbackCards;
+      }
       const now = new Date();
       console.log(
         now.toLocaleString() +
-          " *Now Scrn. - All Jellyfin sessions filtered; using fallback unfiltered session cards"
+          " *Now Scrn. - No Emby/Jellyfin sessions matched user/device filter (" +
+          (users.length ? "users=[" + users.join(",") + "]" : "") +
+          (users.length && devices.length ? " " : "") +
+          (devices.length ? "devices=[" + devices.join(",") + "]" : "") +
+          "); showing none"
       );
-      return fallbackCards;
     }
 
     return nsCards;

@@ -947,7 +947,7 @@
                 <label for="filterUsers">Filter by user(s)</label>
                 <input type="text" class="form-control" id="filterUsers" name="filterUsers" aria-describedby="filterUsersHelp"
                   placeholder="examples -> matt,fred,sally@abc.com" value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.filterUsers%>"<%}else{%><%=settings.filterUsers%>"<%}%>>
-                  <small id="filterUsersHelp" class="form-text text-muted">Enter user names to include (Comma seperated and no spaces. Leave blank for all users)</small>
+                  <small id="filterUsersHelp" class="form-text text-muted">Include only these Emby/Jellyfin/Plex usernames (comma-separated). Use the exact name from the server’s user list (spaces allowed). Leave blank for all users. When set, other household accounts are hidden even if they are the only ones playing.</small>
               </div>    
 
               <div class="form-group">
