@@ -792,6 +792,7 @@ class Kodi {
           sp
         );
       } else if (recentlyAdded > 0) {
+        // Recently-added only when numberOnDemand is 0; both modes when numberOnDemand > 0.
         odRaw = await this.GetOnDemandRawData(
           onDemandLibraries,
           numberOnDemand,
@@ -800,26 +801,31 @@ class Kodi {
           contentRatings,
           false
         );
-        if (odRaw !== undefined) {
-          odRaw = odRaw.concat(
-            await this.GetOnDemandRawData(
+        const alsoRandomOd = Number(numberOnDemand) > 0;
+        if (alsoRandomOd) {
+          if (odRaw !== undefined) {
+            odRaw = odRaw.concat(
+              await this.GetOnDemandRawData(
+                onDemandLibraries,
+                numberOnDemand,
+                genres,
+                0,
+                contentRatings,
+                false
+              )
+            );
+          } else {
+            odRaw = await this.GetOnDemandRawData(
               onDemandLibraries,
               numberOnDemand,
               genres,
               0,
               contentRatings,
               false
-            )
-          );
-        } else {
-          odRaw = await this.GetOnDemandRawData(
-            onDemandLibraries,
-            numberOnDemand,
-            genres,
-            0,
-            contentRatings,
-            false
-          );
+            );
+          }
+        } else if (odRaw === undefined) {
+          odRaw = [];
         }
       } else {
         odRaw = await this.GetOnDemandRawData(
