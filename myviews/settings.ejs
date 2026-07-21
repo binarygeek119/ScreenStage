@@ -776,7 +776,7 @@
                           <% if(typeof formData !== 'undefined' && errors){%><%=(formData.preferCachedPosters == 'true') ? 'checked' : '' %><%}else{%><%=(settings.preferCachedPosters == 'true') ? 'checked' : '' %><%}%>>
                         <label class="custom-control-label" for="preferCachedPosters">Prefer cached poster library</label>
                       </div>
-                      <small class="form-text text-muted">When on (default), slideshow library slides come from the poster cache and metadata database. Plex/Jellyfin/Emby/Kodi on-demand is only used if the cache is empty, and still runs in the background to fill the cache. Now Playing slides are unchanged.</small>
+                      <small class="form-text text-muted">When on (default), slideshow library slides come from the poster cache and metadata database. Automatically off for filtering when <strong>Recently Added In Last n Days</strong> is set (cache has no added dates). Plex/Jellyfin/Emby/Kodi on-demand is used if the cache is empty. Now Playing slides are unchanged. Coming Soon / pictures are interleaved through large library decks so they are not buried at the end.</small>
                     </div>
                     <div class="form-group">
                       <label for="cachedPosterSlideCount">Cached poster slide count</label>
@@ -1032,7 +1032,7 @@
                   <input type="text" class="form-control" id="recentlyAddedDays" name="recentlyAddedDays" aria-describedby="recentlyAddedDaysHelp"
                     placeholder="suggest no more than 45." value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.recentlyAddedDays%>"<%}else{%><%=settings.recentlyAddedDays%>"<%}%>>
                   <small id="recentlyAddedDaysHelp" class="form-text text-muted">Show recently added titles from
-                    each library / media folder / <strong>Kodi video source</strong>. <b>'Content rating'</b> and <b>'Genre' <u>are ignored</u> if this is set to a non-zero value.</b></small>
+                    each library / media folder / <strong>Kodi video source</strong>. Set to a non-zero value to use a live server query (not the full poster cache). With <b>Number to Display = 0</b>, only recently added titles are shown; with a number above 0, those titles are shown <em>plus</em> that many random on-demand titles. <b>'Content rating'</b> and <b>'Genre' <u>are ignored</u> if this is set to a non-zero value.</b></small>
                 </div>
                 <div class="form-group">
                   <label for="numberOnDemand">Number to Display</label>

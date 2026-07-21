@@ -894,6 +894,35 @@ function preferCachedPostersEnabled() {
   return s !== "false" && s !== "0" && s !== "off" && s !== "no";
 }
 
+/** True when on-demand should use live “recently added in n days” filtering (cache cannot apply that filter). */
+function recentlyAddedDaysActive() {
+  if (!loadedSettings) return false;
+  const n = parseInt(loadedSettings.recentlyAddedDays, 10);
+  return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Spread feature cards (Coming Soon, pictures, trivia, …) through a large library deck
+ * so they are not buried after dozens of on-demand/cache slides.
+ */
+function interleaveFeatureCardsThroughLibrary(libraryCards, featureCards) {
+  const lib = Array.isArray(libraryCards) ? libraryCards.slice() : [];
+  const feat = Array.isArray(featureCards) ? featureCards.slice() : [];
+  if (!feat.length) return lib;
+  if (!lib.length) return feat;
+  const out = [];
+  const step = Math.max(1, Math.ceil(lib.length / (feat.length + 1)));
+  let fi = 0;
+  for (let i = 0; i < lib.length; i++) {
+    out.push(lib[i]);
+    if ((i + 1) % step === 0 && fi < feat.length) {
+      out.push(feat[fi++]);
+    }
+  }
+  while (fi < feat.length) out.push(feat[fi++]);
+  return out;
+}
+
 /** True when poster metadata DB has at least one row (sync may have run while server was up). */
 function cachedPosterDbHasRows() {
   try {
@@ -1393,7 +1422,8 @@ async function buildTmdbNowShowingListCards() {
 function buildLibrarySlideDeckFromPosterCache() {
   // Master ON-DEMAND toggle must gate both live fetches and cache-backed library slides.
   if (!isOnDemandEnabled) return [];
-  if (!preferCachedPostersEnabled()) return odCards;
+  // Recently-added day filter requires a live media-server query; the poster cache has no added dates.
+  if (recentlyAddedDaysActive() || !preferCachedPostersEnabled()) return odCards;
   const kind = loadedSettings
     ? getMediaServerKind(loadedSettings.mediaServerType)
     : "";
@@ -1411,6 +1441,7 @@ function buildLibrarySlideDeckFromPosterCache() {
  */
 async function warmCachedPosterDeckEarlyIfPossible() {
   if (!loadedSettings || !isOnDemandEnabled || !preferCachedPostersEnabled()) return;
+  if (recentlyAddedDaysActive()) return;
   if (!cachedPosterDbHasRows()) return;
   const kind = getMediaServerKind(loadedSettings.mediaServerType);
   const warmCount = Math.min(12, primaryCachedPosterSlideCount());
@@ -1745,18 +1776,22 @@ async function loadNowScreening() {
     }
 
     if (loadedSettings.pinNS !== "true") {
+      const featureCards = csCards
+        .concat(csrCards)
+        .concat(cslCards)
+        .concat(picCards)
+        .concat(csbCards)
+        .concat(trivCards)
+        .concat(linkCards);
       if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-        mCards = nsCards.concat(librarySlideCards.concat(csCards.concat(csrCards).concat(cslCards).concat(picCards).concat(linkCards).concat(csbCards).concat(trivCards)).sort(() => Math.random() - 0.5));
+        mCards = nsCards.concat(
+          librarySlideCards.concat(featureCards).sort(() => Math.random() - 0.5)
+        );
       }
       else {
-        mCards = nsCards.concat(librarySlideCards);
-        mCards = mCards.concat(picCards);
-        mCards = mCards.concat(csCards);
-        mCards = mCards.concat(csrCards);
-        mCards = mCards.concat(cslCards);
-        mCards = mCards.concat(csbCards);
-        mCards = mCards.concat(trivCards);
-        mCards = mCards.concat(linkCards);
+        mCards = nsCards.concat(
+          interleaveFeatureCardsThroughLibrary(librarySlideCards, featureCards)
+        );
       }
       pinnedMode = false;
     }
@@ -1785,17 +1820,18 @@ async function loadNowScreening() {
 
     pinnedMode = false;
     if (librarySlideCards.length > 0) {
+      const featureCards = csCards
+        .concat(csrCards)
+        .concat(cslCards)
+        .concat(picCards)
+        .concat(csbCards)
+        .concat(trivCards)
+        .concat(linkCards);
       if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-        mCards = librarySlideCards.concat(csCards.concat(csrCards).concat(cslCards).concat(picCards).concat(csbCards).concat(linkCards).concat(trivCards)).sort(() => Math.random() - 0.5);
+        mCards = librarySlideCards.concat(featureCards).sort(() => Math.random() - 0.5);
       }
       else {
-        mCards = librarySlideCards.concat(csCards);
-        mCards = mCards.concat(picCards);
-        mCards = mCards.concat(csrCards);
-        mCards = mCards.concat(cslCards);
-        mCards = mCards.concat(csbCards);
-        mCards = mCards.concat(trivCards);
-        mCards = mCards.concat(linkCards);
+        mCards = interleaveFeatureCardsThroughLibrary(librarySlideCards, featureCards);
       }
       globalPage.cards = mCards;
     } else {
@@ -2018,7 +2054,8 @@ async function fetchOnDemandCardsFromServer(numberOnDemandOverride) {
       ? numberOnDemandOverride
       : loadedSettings.numberOnDemand;
 
-  if (preferCachedPostersEnabled()) {
+  // Prefer-cache skips live GetOnDemand — but recently-added days need a live filter.
+  if (preferCachedPostersEnabled() && !recentlyAddedDaysActive()) {
     const kind = loadedSettings
       ? getMediaServerKind(loadedSettings.mediaServerType)
       : "";
@@ -2132,7 +2169,9 @@ async function loadOnDemand() {
 
   // Changing timings if media server unavailable (live OD only; cache-backed OD ignores this).
   let odCheckMinutes = loadedSettings.onDemandRefresh;
-  if (!preferCachedPostersEnabled() && isMediaServerUnavailable) {
+  const needsLiveServer =
+    !preferCachedPostersEnabled() || recentlyAddedDaysActive();
+  if (needsLiveServer && isMediaServerUnavailable) {
     odCheckMinutes = 1;
     console.log("✘✘ WARNING ✘✘ - Next on-demand query will run in 1 minute.");
     // restart interval timer
