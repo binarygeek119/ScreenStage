@@ -901,26 +901,73 @@ function recentlyAddedDaysActive() {
   return Number.isFinite(n) && n > 0;
 }
 
+/** Coming Soon from Sonarr / Radarr / Lidarr / Readarr. */
+function collectArrComingSoonCards() {
+  return filterCardsByHiddenContentRatings(
+    []
+      .concat(csCards || [])
+      .concat(csrCards || [])
+      .concat(cslCards || [])
+      .concat(csbCards || [])
+  );
+}
+
 /**
- * Spread feature cards (Coming Soon, pictures, trivia, …) through a large library deck
- * so they are not buried after dozens of on-demand/cache slides.
+ * Drop library/cache slides that duplicate an *arr Coming Soon title (*arr outranks cache/media server).
  */
-function interleaveFeatureCardsThroughLibrary(libraryCards, featureCards) {
-  const lib = Array.isArray(libraryCards) ? libraryCards.slice() : [];
-  const feat = Array.isArray(featureCards) ? featureCards.slice() : [];
-  if (!feat.length) return lib;
-  if (!lib.length) return feat;
-  const out = [];
-  const step = Math.max(1, Math.ceil(lib.length / (feat.length + 1)));
-  let fi = 0;
-  for (let i = 0; i < lib.length; i++) {
-    out.push(lib[i]);
-    if ((i + 1) % step === 0 && fi < feat.length) {
-      out.push(feat[fi++]);
-    }
+function libraryCardsWithoutArrOverlap(libraryCards, arrCards) {
+  const lib = Array.isArray(libraryCards) ? libraryCards : [];
+  const arr = Array.isArray(arrCards) ? arrCards : [];
+  if (!arr.length || !lib.length) return lib.slice();
+  const keys = new Set();
+  for (const c of arr) {
+    const id = String((c && c.DBID) || "")
+      .trim()
+      .toLowerCase();
+    if (id) keys.add("id:" + id);
+    const title = String((c && c.title) || "")
+      .trim()
+      .toLowerCase();
+    if (title) keys.add("t:" + title);
   }
-  while (fi < feat.length) out.push(feat[fi++]);
-  return out;
+  return lib.filter((c) => {
+    const id = String((c && c.DBID) || "")
+      .trim()
+      .toLowerCase();
+    if (id && keys.has("id:" + id)) return false;
+    const title = String((c && c.title) || "")
+      .trim()
+      .toLowerCase();
+    if (title && keys.has("t:" + title)) return false;
+    return true;
+  });
+}
+
+function shuffleCardArray(cards) {
+  return (Array.isArray(cards) ? cards.slice() : []).sort(
+    () => Math.random() - 0.5
+  );
+}
+
+/**
+ * Home deck priority: Now Playing → *arr Coming Soon → poster cache / on-demand → extras.
+ * (*arr > cache > jellyfin/emby/plex). Shuffle only shuffles within each tier.
+ */
+function assembleRankedHomeDeck(nsList, libraryList, shuffle) {
+  const arrCards = collectArrComingSoonCards();
+  const libCards = libraryCardsWithoutArrOverlap(libraryList, arrCards);
+  const extras = []
+    .concat(picCards || [])
+    .concat(trivCards || [])
+    .concat(linkCards || []);
+  const ns = Array.isArray(nsList) ? nsList.slice() : [];
+  if (shuffle) {
+    return ns
+      .concat(shuffleCardArray(arrCards))
+      .concat(shuffleCardArray(libCards))
+      .concat(shuffleCardArray(extras));
+  }
+  return ns.concat(arrCards).concat(libCards).concat(extras);
 }
 
 /** True when poster metadata DB has at least one row (sync may have run while server was up). */
@@ -1418,21 +1465,42 @@ async function buildTmdbNowShowingListCards() {
   return out;
 }
 
+function hideContentRatingsFromSettings() {
+  return util.parseHideContentRatings(
+    loadedSettings && loadedSettings.contentRatings
+  );
+}
+
+function filterCardsByHiddenContentRatings(cards) {
+  const hide = hideContentRatingsFromSettings();
+  if (!hide.length) return Array.isArray(cards) ? cards : [];
+  return (cards || []).filter(
+    (c) =>
+      !util.contentRatingIsHidden(
+        (c && (c.contentRating || c.ratingContent)) || "",
+        hide
+      )
+  );
+}
+
 /** Library-style slides: cached poster DB first when enabled; live on-demand only as backup. */
 function buildLibrarySlideDeckFromPosterCache() {
   // Master ON-DEMAND toggle must gate both live fetches and cache-backed library slides.
   if (!isOnDemandEnabled) return [];
   // Recently-added day filter requires a live media-server query; the poster cache has no added dates.
-  if (recentlyAddedDaysActive() || !preferCachedPostersEnabled()) return odCards;
+  if (recentlyAddedDaysActive() || !preferCachedPostersEnabled()) {
+    return filterCardsByHiddenContentRatings(odCards);
+  }
   const kind = loadedSettings
     ? getMediaServerKind(loadedSettings.mediaServerType)
     : "";
   const cached = posterMetadata.buildFallbackMediaCards(
     primaryCachedPosterSlideCount(),
-    kind
+    kind,
+    hideContentRatingsFromSettings()
   );
   if (cached.length > 0) return cached;
-  return odCards;
+  return filterCardsByHiddenContentRatings(odCards);
 }
 
 /**
@@ -1445,7 +1513,11 @@ async function warmCachedPosterDeckEarlyIfPossible() {
   if (!cachedPosterDbHasRows()) return;
   const kind = getMediaServerKind(loadedSettings.mediaServerType);
   const warmCount = Math.min(12, primaryCachedPosterSlideCount());
-  const cached = posterMetadata.buildFallbackMediaCards(warmCount, kind);
+  const cached = posterMetadata.buildFallbackMediaCards(
+    warmCount,
+    kind,
+    hideContentRatingsFromSettings()
+  );
   if (!cached.length) return;
   globalPage.cards = cached.slice();
   try {
@@ -1776,23 +1848,10 @@ async function loadNowScreening() {
     }
 
     if (loadedSettings.pinNS !== "true") {
-      const featureCards = csCards
-        .concat(csrCards)
-        .concat(cslCards)
-        .concat(picCards)
-        .concat(csbCards)
-        .concat(trivCards)
-        .concat(linkCards);
-      if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-        mCards = nsCards.concat(
-          librarySlideCards.concat(featureCards).sort(() => Math.random() - 0.5)
-        );
-      }
-      else {
-        mCards = nsCards.concat(
-          interleaveFeatureCardsThroughLibrary(librarySlideCards, featureCards)
-        );
-      }
+      const doShuffle =
+        loadedSettings.shuffleSlides !== undefined &&
+        loadedSettings.shuffleSlides == "true";
+      mCards = assembleRankedHomeDeck(nsCards, librarySlideCards, doShuffle);
       pinnedMode = false;
     }
     else {
@@ -1819,20 +1878,11 @@ async function loadNowScreening() {
   //  mCards = [];
 
     pinnedMode = false;
-    if (librarySlideCards.length > 0) {
-      const featureCards = csCards
-        .concat(csrCards)
-        .concat(cslCards)
-        .concat(picCards)
-        .concat(csbCards)
-        .concat(trivCards)
-        .concat(linkCards);
-      if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-        mCards = librarySlideCards.concat(featureCards).sort(() => Math.random() - 0.5);
-      }
-      else {
-        mCards = interleaveFeatureCardsThroughLibrary(librarySlideCards, featureCards);
-      }
+    if (librarySlideCards.length > 0 || collectArrComingSoonCards().length > 0) {
+      const doShuffle =
+        loadedSettings.shuffleSlides !== undefined &&
+        loadedSettings.shuffleSlides == "true";
+      mCards = assembleRankedHomeDeck([], librarySlideCards, doShuffle);
       globalPage.cards = mCards;
     } else {
       if (csCards.length > 0) {
@@ -1957,7 +2007,8 @@ async function loadNowScreening() {
   if (globalPage.cards.length === 0) {
     const cached = posterMetadata.buildFallbackMediaCards(
       posterMetadata.DEFAULT_FALLBACK_COUNT,
-      getMediaServerKind(loadedSettings.mediaServerType)
+      getMediaServerKind(loadedSettings.mediaServerType),
+      hideContentRatingsFromSettings()
     );
     if (cached.length > 0) {
       globalPage.cards = cached;
@@ -2063,7 +2114,11 @@ async function fetchOnDemandCardsFromServer(numberOnDemandOverride) {
       typeof count === "number" ? count : parseInt(String(count), 10);
     const n = !isNaN(nRaw) && nRaw > 0 ? nRaw : primaryCachedPosterSlideCount();
     return apply3dLibraryFlagToCards(
-      posterMetadata.buildFallbackMediaCards(n, kind)
+      posterMetadata.buildFallbackMediaCards(
+        n,
+        kind,
+        hideContentRatingsFromSettings()
+      )
     );
   }
 
@@ -4395,7 +4450,8 @@ app.get(BASEURL + "/now-showing/data", async (req, res) => {
         const kind = getMediaServerKind(loadedSettings.mediaServerType);
         const fb = posterMetadata.buildFallbackMediaCards(
           Math.max(maxN * 2, 24),
-          kind
+          kind,
+          hideContentRatingsFromSettings()
         );
         picked = sampleNowShowingFillersFromOd(fb, curatedSet, maxN);
       }

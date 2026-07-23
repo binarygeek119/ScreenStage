@@ -1530,6 +1530,7 @@ class Plex {
     if (allMetadata.length === 0) return mediaCards;
 
     let mediaResults = allMetadata;
+    // Genre filter only when not in recently-added mode; hide-ratings always apply.
     if (recentlyAdded == 0) {
       const mapGenre = (arr, gs) => {
         return gs.reduce((acc, val) => {
@@ -1543,27 +1544,16 @@ class Plex {
         }, []);
       };
 
-      const mapContentRating = (arr, gs) => {
-        return gs.reduce((acc, val) => {
-          const libMatches = arr.filter(
-            (m) =>
-              m.contentRating !== undefined &&
-              m.contentRating.toLowerCase() === val.toLowerCase()
-          );
-          if (libMatches.length > 0) return acc.concat(libMatches);
-          return acc;
-        }, []);
-      };
-
       if (genres !== undefined && genres.length > 0) {
         mediaResults = mapGenre(allMetadata, genres);
       }
+    }
 
-      if (contentRatings !== undefined && contentRatings.length > 0) {
-        const excludeArray = mapContentRating(mediaResults, contentRatings);
-        const itemsToDeleteSet = new Set(excludeArray);
-        mediaResults = mediaResults.filter((c) => !itemsToDeleteSet.has(c));
-      }
+    if (contentRatings !== undefined && contentRatings.length > 0) {
+      mediaResults = mediaResults.filter(
+        (m) =>
+          !util.contentRatingIsHidden(m.contentRating || "", contentRatings)
+      );
     }
 
     mediaResults.forEach((mt) => {

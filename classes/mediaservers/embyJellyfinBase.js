@@ -217,24 +217,26 @@ function filterMediaItemsForOdemandFilters(items, genres, recentlyAdded, content
     from.setDate(from.getDate() - recentlyAdded);
     from.setHours(0, 0, 0, 0);
     all = all.filter((m) => m.DateCreated && new Date(m.DateCreated) >= from);
-  } else {
-    if (genres && genres.length > 0) {
-      all = all.filter((m) => {
-        const itemGenres = m.Genres || [];
-        return genres.some((val) => {
-          const valLower = (val || "").toLowerCase();
-          return itemGenres.some((g) =>
-            (g || "").toLowerCase().includes(valLower)
-          );
-        });
+  } else if (genres && genres.length > 0) {
+    all = all.filter((m) => {
+      const itemGenres = m.Genres || [];
+      return genres.some((val) => {
+        const valLower = (val || "").toLowerCase();
+        return itemGenres.some((g) =>
+          (g || "").toLowerCase().includes(valLower)
+        );
       });
-    }
-    if (contentRatings && contentRatings.length > 0) {
-      all = all.filter((m) => {
-        const cr = ((m.OfficialRating || "") + "").toLowerCase();
-        return !contentRatings.some((r) => r.toLowerCase() === cr);
-      });
-    }
+    });
+  }
+  // Always apply hide-ratings (including with recently-added days).
+  if (contentRatings && contentRatings.length > 0) {
+    all = all.filter(
+      (m) =>
+        !util.contentRatingIsHidden(
+          m.OfficialRating || m.contentRating || "",
+          contentRatings
+        )
+    );
   }
   return all;
 }

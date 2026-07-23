@@ -611,42 +611,35 @@ class Kodi {
         const dt = new Date(m.dateadded.replace(/ /, "T"));
         return !isNaN(dt.getTime()) && dt >= from;
       });
-    } else {
-      if (genres && genres.length > 0) {
-        const mapGenre = (arr, gs) =>
-          gs.reduce((acc, val) => {
-            const valLower = (val || "").toLowerCase();
-            const libMatches = arr.filter((m) => {
-              const glist = Kodi.genresToArray(m.genre);
-              return glist.some((g) => g.toLowerCase().includes(valLower));
-            });
-            if (libMatches.length > 0) return acc.concat(libMatches);
-            return acc;
-          }, []);
-        const matched = mapGenre(all, genres);
-        const byId = new Map();
-        for (const m of matched) {
-          if (m._kodiKind === "show" && m.tvshowid != null) {
-            byId.set("s" + m.tvshowid, m);
-          } else if (m._kodiKind === "movie" && m.movieid != null) {
-            byId.set("m" + m.movieid, m);
-          } else {
-            byId.set(String(m.title) + (m.file || ""), m);
-          }
+    } else if (genres && genres.length > 0) {
+      const mapGenre = (arr, gs) =>
+        gs.reduce((acc, val) => {
+          const valLower = (val || "").toLowerCase();
+          const libMatches = arr.filter((m) => {
+            const glist = Kodi.genresToArray(m.genre);
+            return glist.some((g) => g.toLowerCase().includes(valLower));
+          });
+          if (libMatches.length > 0) return acc.concat(libMatches);
+          return acc;
+        }, []);
+      const matched = mapGenre(all, genres);
+      const byId = new Map();
+      for (const m of matched) {
+        if (m._kodiKind === "show" && m.tvshowid != null) {
+          byId.set("s" + m.tvshowid, m);
+        } else if (m._kodiKind === "movie" && m.movieid != null) {
+          byId.set("m" + m.movieid, m);
+        } else {
+          byId.set(String(m.title) + (m.file || ""), m);
         }
-        all = Array.from(byId.values());
       }
+      all = Array.from(byId.values());
+    }
 
-      if (contentRatings && contentRatings.length > 0) {
-        const exclude = new Set();
-        for (const m of all) {
-          const cr = (m.mpaa || "").toLowerCase().replace(/^rated\s+/i, "").trim();
-          if (contentRatings.some((r) => r.toLowerCase() === cr)) {
-            exclude.add(m);
-          }
-        }
-        all = all.filter((m) => !exclude.has(m));
-      }
+    if (contentRatings && contentRatings.length > 0) {
+      all = all.filter(
+        (m) => !util.contentRatingIsHidden(m.mpaa || "", contentRatings)
+      );
     }
 
     return all;

@@ -776,7 +776,7 @@
                           <% if(typeof formData !== 'undefined' && errors){%><%=(formData.preferCachedPosters == 'true') ? 'checked' : '' %><%}else{%><%=(settings.preferCachedPosters == 'true') ? 'checked' : '' %><%}%>>
                         <label class="custom-control-label" for="preferCachedPosters">Prefer cached poster library</label>
                       </div>
-                      <small class="form-text text-muted">When on (default), slideshow library slides come from the poster cache and metadata database. Automatically off for filtering when <strong>Recently Added In Last n Days</strong> is set (cache has no added dates). Plex/Jellyfin/Emby/Kodi on-demand is used if the cache is empty. Now Playing slides are unchanged. Coming Soon / pictures are interleaved through large library decks so they are not buried at the end.</small>
+                      <small class="form-text text-muted">When on (default), slideshow library slides come from the poster cache and metadata database. Automatically off for filtering when <strong>Recently Added In Last n Days</strong> is set (cache has no added dates). Slide priority is <strong>*arr Coming Soon → poster cache → Plex/Jellyfin/Emby/Kodi</strong>; *arr always re-fetches its own artwork (does not reuse media-server cache files). Now Playing stays first.</small>
                     </div>
                     <div class="form-group">
                       <label for="cachedPosterSlideCount">Cached poster slide count</label>
@@ -1057,7 +1057,7 @@
                   <label for="contentRatings">Hide Ratings</label>
                   <input type="text" class="form-control" id="contentRatings" name="contentRatings" aria-describedby="contentRatings"
                     placeholder="r,nc-17,pg-13" value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.contentRatings%>"<%}else{%><%=settings.contentRatings%>"<%}%>>
-                  <small id="contentRatings" class="form-text text-muted">Do not show titles with these official ratings (metadata from your server). Ignored if recently added is non-zero.</small>
+                  <small id="contentRatings" class="form-text text-muted">Do not show titles with these official ratings (metadata from your server or poster cache). Comma-separated, e.g. <code>r,nc-17,tv-ma</code>. Matches common forms like <code>R</code>, <code>Rated R</code>, <code>us:R</code>. Also applied to Coming Soon and when Recently Added days are set.</small>
                 </div>
 
                 <h6>Hide Banners</h6>

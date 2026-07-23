@@ -164,8 +164,8 @@ class Sonarr {
           }
 
           let url;
-          // cache poster
-          fileName = rawSeries.data.tvdbId + ".jpg";
+          // Prefer *arr art over any existing media-server cache file for the same id.
+          fileName = "arr-sonarr-" + rawSeries.data.tvdbId + ".jpg";
           // check art exists
           rawSeries.data.images.forEach(i => {
             if(i.coverType == "poster"){
@@ -173,7 +173,7 @@ class Sonarr {
             }
           });
           if (url !== undefined) {
-            await core.CacheImage(url, fileName);
+            await core.CacheArrImage(url, fileName);
             medCard.posterURL = "/imagecache/" + fileName;
           } else {
             medCard.posterURL = "/images/no-poster-available.png";
@@ -181,7 +181,7 @@ class Sonarr {
 
           // cache art image
           if(hasArt=='true'){
-            fileName = rawSeries.data.tvdbId + "-art.jpg";
+            fileName = "arr-sonarr-" + rawSeries.data.tvdbId + "-art.jpg";
             // check art exists
             rawSeries.data.images.forEach(i => {
               if(i.coverType == "fanart"){
@@ -189,7 +189,7 @@ class Sonarr {
               }
             });
             if (url !== undefined) {
-              await core.CacheImage(url, fileName);
+              await core.CacheArrImage(url, fileName);
               medCard.posterArtURL = "/imagecache/" + fileName;
             }
           }

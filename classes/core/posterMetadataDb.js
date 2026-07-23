@@ -969,7 +969,7 @@ function registerFromMediaServerCards(nsCards, odCards, serverKind) {
   };
 }
 
-function pickRandomEntries(count, serverKindOpt) {
+function pickRandomEntries(count, serverKindOpt, hideContentRatings) {
   let valid = selectAllEntries().filter((e) => e.cacheFile && fileOk(e.cacheFile));
   if (valid.length === 0) return [];
   const wantKind =
@@ -982,6 +982,16 @@ function pickRandomEntries(count, serverKindOpt) {
     );
     if (filtered.length > 0) valid = filtered;
   }
+  const hide = Array.isArray(hideContentRatings)
+    ? hideContentRatings.map((r) => String(r || "").toLowerCase().trim()).filter(Boolean)
+    : [];
+  if (hide.length > 0) {
+    const util = require("./utility");
+    valid = valid.filter(
+      (e) => !util.contentRatingIsHidden(e.contentRating || "", hide)
+    );
+  }
+  if (valid.length === 0) return [];
   const shuffled = valid.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -1102,16 +1112,17 @@ function applyCachedPostersToMediaCards(cards, serverKind) {
  * Build on-demand style cards from the poster metadata DB when nothing else is available.
  * @param {number} count
  * @param {string} [serverKind] When set, prefer random picks from this server (plex|jellyfin|emby|kodi).
+ * @param {string[]} [hideContentRatings] Hide Ratings list (normalized or raw).
  * @returns {MediaCard[]}
  */
-function buildFallbackMediaCards(count, serverKind) {
+function buildFallbackMediaCards(count, serverKind, hideContentRatings) {
   const n =
     typeof count === "number" &&
     count > 0 &&
     Number.isFinite(count)
       ? Math.floor(count)
       : DEFAULT_FALLBACK_COUNT;
-  const rows = pickRandomEntries(n, serverKind);
+  const rows = pickRandomEntries(n, serverKind, hideContentRatings);
   const cards = [];
   for (const row of rows) {
     const c = new MediaCard();
@@ -1181,7 +1192,7 @@ function buildFallbackMediaCards(count, serverKind) {
  */
 async function clearPosterCacheAndMetadata() {
   await Cache.DeleteImageCache();
-  fs.mkdirSync(SAVED, { recursive: true });
+  fs.mkdirSync(CACHE_ROOT, { recursive: true });
   assertDb();
   _sqlDb.run("DELETE FROM poster_entries");
   persistDb();

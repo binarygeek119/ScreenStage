@@ -30,6 +30,16 @@ class Cache {
   }
 
   /**
+   * *arr (Sonarr/Radarr/Lidarr/Readarr) artwork: always re-fetch from the *arr URL.
+   * Shared filenames like `{tvdbId}.jpg` / `{tmdbId}.jpg` may already exist from
+   * Plex/Jellyfin/Emby sync — those must not outrank *arr art.
+   */
+  static async CacheArrImage(url, fileName, options) {
+    const savePath = path.join(IMAGE_CACHE_DIR, fileName);
+    return this.downloadImageForce(url, savePath, options);
+  }
+
+  /**
    * Re-download an image even if the file already exists (poster metadata refresh).
    * @param {string} url
    * @param {string} savePath absolute or relative path
