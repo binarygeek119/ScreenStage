@@ -33,6 +33,41 @@ class utility {
       .replace(/"/g, "&quot;");
   }
 
+  /**
+   * Normalize official content ratings for hide-list matching
+   * (e.g. "R", "Rated R", "us:R", "R - Restricted" → "r"; keep "pg-13").
+   */
+  static normalizeContentRating(raw) {
+    let s = String(raw || "")
+      .toLowerCase()
+      .trim();
+    if (!s) return "";
+    s = s.replace(/^rated\s+/i, "").trim();
+    // Country prefix only when followed by : or / (not hyphen — that breaks pg-13).
+    s = s.replace(/^[a-z]{2,3}\s*[:\/]\s*/i, "").trim();
+    s = s.split(/\s+[\-–—]\s+/)[0] || s;
+    s = s.split(/\s*\(/)[0] || s;
+    return String(s).trim();
+  }
+
+  /** Parse Hide Ratings setting → lowercase normalized tokens. */
+  static parseHideContentRatings(raw) {
+    return String(raw || "")
+      .split(",")
+      .map((s) => utility.normalizeContentRating(s))
+      .filter(Boolean);
+  }
+
+  /** True if itemRating matches any hide-list entry after normalization. */
+  static contentRatingIsHidden(itemRating, hideList) {
+    if (!hideList || !hideList.length) return false;
+    const cr = utility.normalizeContentRating(itemRating);
+    if (!cr) return false;
+    return hideList.some(
+      (r) => utility.normalizeContentRating(r) === cr
+    );
+  }
+
   /** Plex Genre/Role/Director-style entries: { tag } or { Tag } */
   static _plexTagNames(tagged, max) {
     if (tagged == null) return "";

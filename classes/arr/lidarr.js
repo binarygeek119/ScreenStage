@@ -159,10 +159,12 @@ class Lidarr {
           medCard.rating = Math.round(md.ratings.value * 10) + "%";
         }
 
-        const safeFileBase = String(medCard.DBID).replace(/[^a-zA-Z0-9._-]/g, "_");
+        const safeFileBase =
+          "arr-lidarr-" +
+          String(medCard.DBID).replace(/[^a-zA-Z0-9._-]/g, "_");
         let posterUrl = Lidarr.pickCoverUrl(md.images);
         if (posterUrl) {
-          await core.CacheImage(posterUrl, safeFileBase + ".jpg");
+          await core.CacheArrImage(posterUrl, safeFileBase + ".jpg");
           medCard.posterURL = "/imagecache/" + safeFileBase + ".jpg";
         } else {
           medCard.posterURL = "/images/no-poster-available.png";
@@ -171,7 +173,7 @@ class Lidarr {
         if (hasArt === "true") {
           const fan = Lidarr.pickFanartUrl(md.images);
           if (fan) {
-            await core.CacheImage(fan, safeFileBase + "-art.jpg");
+            await core.CacheArrImage(fan, safeFileBase + "-art.jpg");
             medCard.posterArtURL = "/imagecache/" + safeFileBase + "-art.jpg";
           }
         }
@@ -179,7 +181,7 @@ class Lidarr {
         const artistImgs = md.artist && md.artist.images;
         const artistPoster = Lidarr.pickArtistImageUrl(artistImgs);
         if (artistPoster) {
-          await core.CacheImage(artistPoster, safeFileBase + "-artist.jpg");
+          await core.CacheArrImage(artistPoster, safeFileBase + "-artist.jpg");
           medCard.portraitArtistURL = "/imagecache/" + safeFileBase + "-artist.jpg";
         }
 

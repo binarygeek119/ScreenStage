@@ -107,11 +107,10 @@ class Radarr {
 
         medCard.theme = "";
 
-      // cache image
+      // Prefer *arr art over any existing media-server cache file for the same id.
       let fileName;
       let url;
-      // cache poster
-      fileName = md.tmdbId + ".jpg";
+      fileName = "arr-radarr-" + md.tmdbId + ".jpg";
       // check art exists
       md.images.forEach(i => {
         if(i.coverType == "poster"){
@@ -120,7 +119,7 @@ class Radarr {
       });
 
       if (url !== undefined) {
-        await core.CacheImage(url, fileName);
+        await core.CacheArrImage(url, fileName);
         medCard.posterURL = "/imagecache/" + fileName;
       } else {
         // if no poster available, use the generic one
@@ -129,7 +128,7 @@ class Radarr {
 
       // cache art image
       if(hasArt=='true'){
-        fileName = md.tmdbId + "-art.jpg";
+        fileName = "arr-radarr-" + md.tmdbId + "-art.jpg";
         // check art exists
         md.images.forEach(i => {
           if(i.coverType == "fanart"){
@@ -137,7 +136,7 @@ class Radarr {
           }
         });
         if (url !== undefined) {
-          await core.CacheImage(url, fileName);
+          await core.CacheArrImage(url, fileName);
           medCard.posterArtURL = "/imagecache/" + fileName;
         }
       }

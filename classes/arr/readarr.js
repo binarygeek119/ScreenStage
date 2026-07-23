@@ -231,11 +231,11 @@ class Readarr {
           medCard.posterURL = "/images/no-cover-available.png";
         }
         else {
-          // cache poster image
-          let fileName = md.foreignBookId + ".jpg";
+          // Prefer *arr art over any existing media-server cache file for the same id.
+          let fileName = "arr-readarr-" + md.foreignBookId + ".jpg";
           let url = cover;
           let dlResult;
-          dlResult = await core.CacheImage(url, fileName);
+          dlResult = await core.CacheArrImage(url, fileName);
           medCard.posterURL = "/imagecache/" + fileName;
         }
         if (
@@ -245,14 +245,14 @@ class Readarr {
           medCard.posterURL.indexOf("/imagecache/") === 0
         ) {
           try {
-            const artName = md.foreignBookId + "-art.jpg";
+            const artName = "arr-readarr-" + md.foreignBookId + "-art.jpg";
             const artUrl =
               this.readarrUrl +
               "/api/v1/mediacover/book/" +
               md.id +
               "/cover.jpg?apikey=" +
               this.readarrToken;
-            await core.CacheImage(artUrl, artName);
+            await core.CacheArrImage(artUrl, artName);
             medCard.posterArtURL = "/imagecache/" + artName;
           } catch (e) {
             medCard.posterArtURL = "";
