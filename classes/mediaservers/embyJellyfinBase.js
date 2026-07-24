@@ -203,6 +203,24 @@ function _axiosErrorIsMisleadingMaxContentLengthAbort(e) {
 }
 
 /**
+ * Library “date added” for recently-added filtering — never PremiereDate / cache sync time.
+ * @param {object} m Emby/Jellyfin item
+ * @returns {Date|null}
+ */
+function itemLibraryAddedDate(m) {
+  if (!m || typeof m !== "object") return null;
+  const raw =
+    m.DateCreated ||
+    m.dateCreated ||
+    m.DateLastSaved ||
+    m.dateLastSaved ||
+    "";
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
  * Same filtering as the legacy “load entire library then filter” path, applied to one page of Items.
  * @param {object[]} items
  * @param {string[]} genres
@@ -214,9 +232,35 @@ function filterMediaItemsForOdemandFilters(items, genres, recentlyAdded, content
   let all = items.slice();
   if (recentlyAdded > 0) {
     const from = new Date();
-    from.setDate(from.getDate() - recentlyAdded);
+    from.setDate(from.getDate() - Number(recentlyAdded));
     from.setHours(0, 0, 0, 0);
-    all = all.filter((m) => m.DateCreated && new Date(m.DateCreated) >= from);
+    const before = all.length;
+    let missingDates = 0;
+    all = all.filter((m) => {
+      const added = itemLibraryAddedDate(m);
+      if (!added) {
+        missingDates++;
+        return false;
+      }
+      return added >= from;
+    });
+    if (before > 0 && missingDates === before) {
+      console.log(
+        new Date().toLocaleString() +
+          " *On-demand — Recently Added: server returned no DateCreated on items; refusing to show the full library. Ensure Fields includes DateCreated."
+      );
+    } else if (before > 0) {
+      console.log(
+        new Date().toLocaleString() +
+          " *On-demand — Recently Added last " +
+          recentlyAdded +
+          " day(s): " +
+          all.length +
+          "/" +
+          before +
+          " title(s) (library DateCreated, not poster-cache time)"
+      );
+    }
   } else if (genres && genres.length > 0) {
     all = all.filter((m) => {
       const itemGenres = m.Genres || [];
@@ -2110,8 +2154,18 @@ class EmbyJellyfinBase {
       Recursive: true,
       IncludeItemTypes: EmbyJellyfinBase.splitCsvTypes(includeTypes),
     };
-    // Cast (People) + marketing taglines + plot text; same field set for full and metadata-only sync.
-    baseParams.Fields = "People,Taglines,Overview,Genres";
+    // Cast (People) + marketing taglines + plot + DateCreated (required for Recently Added days).
+    // Without DateCreated in Fields, Jellyfin/Emby often omit it and the day filter cannot work.
+    baseParams.Fields = "People,Taglines,Overview,Genres,DateCreated";
+    if (recentlyAdded > 0) {
+      const from = new Date();
+      from.setDate(from.getDate() - Number(recentlyAdded));
+      from.setHours(0, 0, 0, 0);
+      // Server-side filter when supported (Jellyfin; Emby ignores unknown query keys).
+      baseParams.MinDateCreated = from.toISOString();
+      baseParams.SortBy = "DateCreated";
+      baseParams.SortOrder = "Descending";
+    }
 
     const streaming =
       streamOptions && typeof streamOptions.onPage === "function";
@@ -2646,7 +2700,8 @@ class EmbyJellyfinBase {
           );
         }
       } else if (recentlyAdded > 0) {
-        // Recently-added only when numberOnDemand is 0; both modes when numberOnDemand > 0.
+        // Recently-added window only — do not append the full library (that looked like
+        // “show everything” when Number to Display was > 0).
         odRaw = await this.GetOnDemandRawData(
           onDemandLibraries,
           numberOnDemand,
@@ -2656,34 +2711,7 @@ class EmbyJellyfinBase {
           false,
           false
         );
-        const alsoRandomOd = Number(numberOnDemand) > 0;
-        if (alsoRandomOd) {
-          if (odRaw !== undefined) {
-            odRaw = odRaw.concat(
-              await this.GetOnDemandRawData(
-                onDemandLibraries,
-                numberOnDemand,
-                genres,
-                0,
-                contentRatings,
-                false,
-                false
-              )
-            );
-          } else {
-            odRaw = await this.GetOnDemandRawData(
-              onDemandLibraries,
-              numberOnDemand,
-              genres,
-              0,
-              contentRatings,
-              false,
-              false
-            );
-          }
-        } else if (odRaw === undefined) {
-          odRaw = [];
-        }
+        if (odRaw === undefined) odRaw = [];
       } else {
         odRaw = await this.GetOnDemandRawData(
           onDemandLibraries,

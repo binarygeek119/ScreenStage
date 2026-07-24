@@ -228,6 +228,111 @@ class Radarr {
 
     return csrCards;
   }
+
+  /**
+   * Movies imported/added in the last N days (movieFile.dateAdded, else movie.added).
+   * Uses *arr artwork (not media-server poster cache).
+   */
+  async GetRecentlyAdded(days, hasArt) {
+    const cards = [];
+    const dayCount = Math.max(0, Number(days) || 0);
+    if (dayCount <= 0) return cards;
+
+    const from = new Date();
+    from.setDate(from.getDate() - dayCount);
+    from.setHours(0, 0, 0, 0);
+
+    let raw;
+    try {
+      raw = await axios.get(
+        this.radarrUrl + "/api/v3/movie?apikey=" + this.radarrToken
+      );
+    } catch (err) {
+      const d = new Date();
+      console.log(
+        d.toLocaleString() + " *Radarr - Get recently added:",
+        err.message
+      );
+      throw err;
+    }
+
+    const movies = Array.isArray(raw.data) ? raw.data : [];
+    for (const md of movies) {
+      if (!md || md.hasFile !== true) continue;
+      const addedRaw =
+        (md.movieFile && (md.movieFile.dateAdded || md.movieFile.DateAdded)) ||
+        md.added ||
+        md.Added ||
+        "";
+      if (!addedRaw) continue;
+      const added = new Date(addedRaw);
+      if (Number.isNaN(added.getTime()) || added < from) continue;
+
+      const medCard = new mediaCard();
+      const addedDay = added.toISOString().split("T")[0];
+      medCard.tagLine = md.title + " (" + addedDay + ")";
+      medCard.title = md.title;
+      medCard.DBID = md.tmdbId;
+      medCard.runTime = md.runtime;
+      medCard.genre = md.genres;
+      medCard.summary = await util.emptyIfNull(md.overview);
+      medCard.mediaType = "movie";
+      medCard.cardType = cType.CardTypeEnum.RecentlyAdded;
+      medCard.studio = md.studio || "";
+      medCard.theme = "";
+      medCard.posterAR = 1.47;
+
+      let contentRating = "NR";
+      if (!(await util.isEmpty(md.certification))) {
+        contentRating = md.certification;
+      }
+      medCard.contentRating = contentRating;
+      medCard.ratingColour = "badge-dark";
+      const cr = String(contentRating).toLowerCase();
+      if (cr === "g" || cr === "tv-g" || cr === "tv-y") medCard.ratingColour = "badge-success";
+      else if (cr === "pg" || cr === "tv-pg" || cr === "tv-y7") medCard.ratingColour = "badge-info";
+      else if (cr === "pg-13" || cr === "tv-14") medCard.ratingColour = "badge-warning";
+      else if (cr === "r" || cr === "nc-17" || cr === "tv-ma") medCard.ratingColour = "badge-danger";
+
+      let posterUrl;
+      const images = Array.isArray(md.images) ? md.images : [];
+      images.forEach((i) => {
+        if (i.coverType === "poster") posterUrl = i.remoteUrl;
+      });
+      const fileName = "arr-radarr-ra-" + md.tmdbId + ".jpg";
+      if (posterUrl) {
+        await core.CacheArrImage(posterUrl, fileName);
+        medCard.posterURL = "/imagecache/" + fileName;
+      } else {
+        medCard.posterURL = "/images/no-poster-available.png";
+      }
+
+      if (hasArt === "true") {
+        let fanUrl;
+        images.forEach((i) => {
+          if (i.coverType === "fanart") fanUrl = i.remoteUrl;
+        });
+        if (fanUrl) {
+          const artName = "arr-radarr-ra-" + md.tmdbId + "-art.jpg";
+          await core.CacheArrImage(fanUrl, artName);
+          medCard.posterArtURL = "/imagecache/" + artName;
+        }
+      }
+
+      cards.push(medCard);
+    }
+
+    const now = new Date();
+    console.log(
+      now.toLocaleString() +
+        " *Radarr — Recently added last " +
+        dayCount +
+        " day(s): " +
+        cards.length +
+        " movie(s)"
+    );
+    return cards;
+  }
 }
 
 module.exports = Radarr;

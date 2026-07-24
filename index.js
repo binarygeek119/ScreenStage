@@ -2122,28 +2122,106 @@ async function fetchOnDemandCardsFromServer(numberOnDemandOverride) {
     );
   }
 
-  const PmsOd = getMediaServerClass(loadedSettings.mediaServerType);
-  const ms = new PmsOd({
-    plexHTTPS: loadedSettings.plexHTTPS,
-    plexIP: loadedSettings.plexIP,
-    plexPort: loadedSettings.plexPort,
-    plexToken: loadedSettings.plexToken,
-  });
-  const cards = await ms.GetOnDemand(
-    loadedSettings.onDemandLibraries,
-    count,
-    loadedSettings.playThemes,
-    loadedSettings.genericThemes,
-    loadedSettings.hasArt,
-    loadedSettings.genres,
-    loadedSettings.recentlyAddedDays,
-    loadedSettings.contentRatings,
-    {
-      imagePull: buildImagePullOptions(),
-      tmdbApiKey: loadedSettings.tmdbApiKey || "",
+  let cards = [];
+  if (isMediaServerEnabled) {
+    const PmsOd = getMediaServerClass(loadedSettings.mediaServerType);
+    const ms = new PmsOd({
+      plexHTTPS: loadedSettings.plexHTTPS,
+      plexIP: loadedSettings.plexIP,
+      plexPort: loadedSettings.plexPort,
+      plexToken: loadedSettings.plexToken,
+    });
+    cards = await ms.GetOnDemand(
+      loadedSettings.onDemandLibraries,
+      count,
+      loadedSettings.playThemes,
+      loadedSettings.genericThemes,
+      loadedSettings.hasArt,
+      loadedSettings.genres,
+      loadedSettings.recentlyAddedDays,
+      loadedSettings.contentRatings,
+      {
+        imagePull: buildImagePullOptions(),
+        tmdbApiKey: loadedSettings.tmdbApiKey || "",
+      }
+    );
+  }
+
+  // Recently-added: also pull from *arr (import/added dates outrank cache; merge with server).
+  if (recentlyAddedDaysActive()) {
+    const days = parseInt(loadedSettings.recentlyAddedDays, 10);
+    const arrRa = await fetchArrRecentlyAddedCards(days);
+    if (arrRa.length) {
+      cards = mergeRecentlyAddedServerAndArr(cards, arrRa);
+      const nRaw =
+        typeof count === "number" ? count : parseInt(String(count), 10);
+      if (!isNaN(nRaw) && nRaw > 0 && cards.length > nRaw) {
+        cards = await util.build_random_od_set(nRaw, cards, 0);
+      }
     }
-  );
+  }
+
   return apply3dLibraryFlagToCards(cards);
+}
+
+/**
+ * Recently imported titles from Radarr/Sonarr (*arr added/import date, not poster-cache time).
+ */
+async function fetchArrRecentlyAddedCards(days) {
+  const out = [];
+  const dayCount = parseInt(days, 10);
+  if (!Number.isFinite(dayCount) || dayCount <= 0) return out;
+  const hasArt = loadedSettings && loadedSettings.hasArt;
+
+  if (isRadarrEnabled) {
+    try {
+      const radarr = new radr(
+        loadedSettings.radarrURL,
+        loadedSettings.radarrToken
+      );
+      const movies = await radarr.GetRecentlyAdded(dayCount, hasArt);
+      if (Array.isArray(movies)) out.push(...movies);
+    } catch (err) {
+      const d = new Date();
+      console.log(
+        d.toLocaleString() +
+          " *Recently Added - Radarr: " +
+          (err && err.message ? err.message : err)
+      );
+    }
+  }
+
+  if (isSonarrEnabled) {
+    try {
+      const sonarr = new sonr(
+        loadedSettings.sonarrURL,
+        loadedSettings.sonarrToken
+      );
+      const shows = await sonarr.GetRecentlyAdded(
+        dayCount,
+        loadedSettings.playThemes,
+        hasArt
+      );
+      if (Array.isArray(shows)) out.push(...shows);
+    } catch (err) {
+      const d = new Date();
+      console.log(
+        d.toLocaleString() +
+          " *Recently Added - Sonarr: " +
+          (err && err.message ? err.message : err)
+      );
+    }
+  }
+
+  return filterCardsByHiddenContentRatings(out);
+}
+
+/** *arr recently-added cards first, then media-server cards that do not duplicate them. */
+function mergeRecentlyAddedServerAndArr(serverCards, arrCards) {
+  const arr = Array.isArray(arrCards) ? arrCards : [];
+  const server = Array.isArray(serverCards) ? serverCards : [];
+  if (!arr.length) return server.slice();
+  return arr.concat(libraryCardsWithoutArrOverlap(server, arr));
 }
 
 /**
@@ -2377,48 +2455,50 @@ async function checkEnabled() {
   } else {
     isMediaServerEnabled = false;
   }
-  
+
+  // check Sonarr / Radarr before on-demand (recently-added can use *arr alone)
+  if (
+    loadedSettings.sonarrURL !== undefined &&
+    loadedSettings.sonarrCalDays !== undefined &&
+    loadedSettings.sonarrToken !== undefined &&
+    loadedSettings.enableSonarr !== "false"
+  ) {
+    isSonarrEnabled = true;
+  } else {
+    isSonarrEnabled = false;
+  }
+
+  if (
+    loadedSettings.radarrURL !== undefined &&
+    loadedSettings.radarrCalDays !== undefined &&
+    loadedSettings.radarrToken !== undefined &&
+    loadedSettings.enableRadarr !== "false"
+  ) {
+    isRadarrEnabled = true;
+  } else {
+    isRadarrEnabled = false;
+  }
+
   // On-demand: live library fetches need a configured media server; cache-backed slides can run
   // offline when "Prefer cached poster library" is on and the poster DB has rows (filled by sync).
+  // Recently-added days can also run from Radarr/Sonarr imports alone.
   const odNotDisabled = loadedSettings.enableOD !== "false";
   const libsConfigured =
     loadedSettings.onDemandLibraries !== undefined &&
     String(loadedSettings.onDemandLibraries || "").trim().length > 0;
   const numConfigured = loadedSettings.numberOnDemand !== undefined;
+  const arrRecentlyAddedOk =
+    recentlyAddedDaysActive() && (isSonarrEnabled || isRadarrEnabled);
   if (!odNotDisabled || !numConfigured) {
     isOnDemandEnabled = false;
+  } else if (arrRecentlyAddedOk) {
+    isOnDemandEnabled = true;
   } else if (preferCachedPostersEnabled()) {
     isOnDemandEnabled =
       cachedPosterDbHasRows() ||
       (isMediaServerEnabled && libsConfigured);
   } else {
     isOnDemandEnabled = isMediaServerEnabled && libsConfigured;
-  }
-  
-  // check Sonarr
-  if (
-    loadedSettings.sonarrURL !== undefined &&
-    loadedSettings.sonarrCalDays !== undefined &&
-    loadedSettings.sonarrToken !== undefined &&
-    loadedSettings.enableSonarr !== 'false'
-  ) {
-    isSonarrEnabled = true;
-  }
-  else{
-    isSonarrEnabled = false;
-  }
-  
-  // check Radarr
-  if (
-    loadedSettings.radarrURL !== undefined &&
-    loadedSettings.radarrCalDays !== undefined &&
-    loadedSettings.radarrToken !== undefined &&
-    loadedSettings.enableRadarr !== 'false'
-  ) {
-    isRadarrEnabled = true;
-  }
-  else{
-    isRadarrEnabled = false;
   }
 
   // check Lidarr
@@ -2428,23 +2508,22 @@ async function checkEnabled() {
     loadedSettings.lidarrCalDays !== undefined &&
     loadedSettings.lidarrToken &&
     String(loadedSettings.lidarrToken).trim() !== "" &&
-    loadedSettings.enableLidarr !== 'false'
+    loadedSettings.enableLidarr !== "false"
   ) {
     isLidarrEnabled = true;
   } else {
     isLidarrEnabled = false;
   }
-  
+
   // check Readarr
   if (
     loadedSettings.readarrURL !== undefined &&
     loadedSettings.readarrCalDays !== undefined &&
     loadedSettings.readarrToken !== undefined &&
-    loadedSettings.enableReadarr !== 'false'
+    loadedSettings.enableReadarr !== "false"
   ) {
     isReadarrEnabled = true;
-  }
-  else{
+  } else {
     isReadarrEnabled = false;
   }
 
