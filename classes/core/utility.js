@@ -166,9 +166,7 @@ class utility {
     if (options && options.includeAll === true) {
       return Array.isArray(mediaCards) ? mediaCards.slice() : [];
     }
-    if (recentlyAdded > 0) {
-      return mediaCards;
-    }
+    // Recently-added pool: still honor Number to Display as a cap (0 = all matching).
     const pool = Array.isArray(mediaCards) ? mediaCards.slice() : [];
     if (pool.length === 0) {
       return [];

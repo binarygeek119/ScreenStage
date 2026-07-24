@@ -271,6 +271,150 @@ class Sonarr {
     }
     return csCards;
   }
+
+  /**
+   * Series with episode imports in the last N days (history downloadFolderImported).
+   * Uses *arr artwork (not media-server poster cache).
+   */
+  async GetRecentlyAdded(days, playThemes, hasArt) {
+    const cards = [];
+    const dayCount = Math.max(0, Number(days) || 0);
+    if (dayCount <= 0) return cards;
+
+    const from = new Date();
+    from.setDate(from.getDate() - dayCount);
+    from.setHours(0, 0, 0, 0);
+
+    let hist;
+    try {
+      hist = await axios.get(
+        this.sonarrUrl +
+          "/api/v3/history?page=1&pageSize=250&sortKey=date&sortDirection=descending" +
+          "&eventType=3&includeSeries=true&includeEpisode=true&apikey=" +
+          this.sonarrToken
+      );
+    } catch (err) {
+      const d = new Date();
+      console.log(
+        d.toLocaleString() + " *Sonarr - Get recently added history:",
+        err.message
+      );
+      throw err;
+    }
+
+    const records =
+      hist && hist.data && Array.isArray(hist.data.records)
+        ? hist.data.records
+        : Array.isArray(hist.data)
+          ? hist.data
+          : [];
+
+    const bySeries = new Map();
+    for (const rec of records) {
+      if (!rec) continue;
+      const when = rec.date ? new Date(rec.date) : null;
+      if (!when || Number.isNaN(when.getTime()) || when < from) continue;
+      const series = rec.series || {};
+      const seriesId = series.id || rec.seriesId;
+      if (!seriesId) continue;
+      const key = String(seriesId);
+      const prev = bySeries.get(key);
+      if (!prev || when > prev.when) {
+        bySeries.set(key, { when, series, episode: rec.episode || {} });
+      }
+    }
+
+    for (const { when, series, episode } of bySeries.values()) {
+      let rawSeries = { data: series };
+      if (!series.images || !series.tvdbId) {
+        try {
+          rawSeries = await this.GetSeriesRawData(series.id || series.Id);
+        } catch (e) {
+          continue;
+        }
+      }
+      const sd = rawSeries.data || series;
+      const tvdbId = sd.tvdbId || sd.TvdbId;
+      if (!tvdbId) continue;
+
+      const medCard = new mediaCard();
+      const addedDay = when.toISOString().split("T")[0];
+      const epLabel =
+        episode && episode.seasonNumber != null && episode.episodeNumber != null
+          ? "S" +
+            String(episode.seasonNumber).padStart(2, "0") +
+            "E" +
+            String(episode.episodeNumber).padStart(2, "0")
+          : "";
+      medCard.tagLine =
+        (sd.title || series.title || "") +
+        (epLabel ? " — " + epLabel : "") +
+        " (" +
+        addedDay +
+        ")";
+      medCard.title = episode.title || sd.title || series.title || "";
+      medCard.DBID = tvdbId;
+      medCard.year = addedDay;
+      medCard.runTime = sd.runtime;
+      medCard.genre = sd.genres;
+      medCard.summary = await util.emptyIfNull(sd.overview);
+      medCard.mediaType = "episode";
+      medCard.cardType = cType.CardTypeEnum.RecentlyAdded;
+      medCard.network = sd.network || "";
+      medCard.posterAR = 1.47;
+
+      let contentRating = "NR";
+      if (!(await util.isEmpty(sd.certification))) {
+        contentRating = sd.certification;
+      }
+      medCard.contentRating = contentRating;
+      medCard.ratingColour = "badge-dark";
+
+      if (playThemes == "true") {
+        const mp3 = tvdbId + ".mp3";
+        await core.CacheMP3(mp3);
+        medCard.theme = "/mp3cache/" + mp3;
+      }
+
+      let posterUrl;
+      const images = Array.isArray(sd.images) ? sd.images : [];
+      images.forEach((i) => {
+        if (i.coverType === "poster") posterUrl = i.remoteUrl;
+      });
+      const fileName = "arr-sonarr-ra-" + tvdbId + ".jpg";
+      if (posterUrl) {
+        await core.CacheArrImage(posterUrl, fileName);
+        medCard.posterURL = "/imagecache/" + fileName;
+      } else {
+        medCard.posterURL = "/images/no-poster-available.png";
+      }
+
+      if (hasArt == "true") {
+        let fanUrl;
+        images.forEach((i) => {
+          if (i.coverType === "fanart") fanUrl = i.remoteUrl;
+        });
+        if (fanUrl) {
+          const artName = "arr-sonarr-ra-" + tvdbId + "-art.jpg";
+          await core.CacheArrImage(fanUrl, artName);
+          medCard.posterArtURL = "/imagecache/" + artName;
+        }
+      }
+
+      cards.push(medCard);
+    }
+
+    const now = new Date();
+    console.log(
+      now.toLocaleString() +
+        " *Sonarr — Recently added last " +
+        dayCount +
+        " day(s): " +
+        cards.length +
+        " series import(s)"
+    );
+    return cards;
+  }
 }
 
 module.exports = Sonarr;

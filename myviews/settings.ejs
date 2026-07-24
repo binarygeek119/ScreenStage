@@ -1031,14 +1031,13 @@
                   <label for="recentlyAddedDays">Recently Added In Last n Days</label>
                   <input type="text" class="form-control" id="recentlyAddedDays" name="recentlyAddedDays" aria-describedby="recentlyAddedDaysHelp"
                     placeholder="suggest no more than 45." value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.recentlyAddedDays%>"<%}else{%><%=settings.recentlyAddedDays%>"<%}%>>
-                  <small id="recentlyAddedDaysHelp" class="form-text text-muted">Show recently added titles from
-                    each library / media folder / <strong>Kodi video source</strong>. Set to a non-zero value to use a live server query (not the full poster cache). With <b>Number to Display = 0</b>, only recently added titles are shown; with a number above 0, those titles are shown <em>plus</em> that many random on-demand titles. <b>'Content rating'</b> and <b>'Genre' <u>are ignored</u> if this is set to a non-zero value.</b></small>
+                  <small id="recentlyAddedDaysHelp" class="form-text text-muted">Show titles added in the last n days from your <strong>media server</strong> (Emby/Jellyfin/Plex <code>DateCreated</code>) <strong>and</strong> from <strong>Radarr/Sonarr</strong> (file import / <code>movieFile.dateAdded</code>, episode import history) — not poster-cache sync time. *arr matches outrank media-server duplicates and use *arr artwork. <b>Number to Display</b> caps the combined list (<strong>0 = all</strong>). Hide-ratings still apply. Coming Soon (*arr calendar) is separate and still shown.</small>
                 </div>
                 <div class="form-group">
                   <label for="numberOnDemand">Number to Display</label>
                   <input type="text" class="form-control" id="numberOnDemand" name="numberOnDemand" aria-describedby="numberOnDemandHelp"
                     placeholder="suggest 5 or 6. (lower numbers perform better)" value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.numberOnDemand%>"<%}else{%><%=settings.numberOnDemand%>"<%}%>>
-                  <small id="numberOnDemandHelp" class="form-text text-muted">Random titles per library, media folder, or <strong>Kodi source</strong> (see list above). Set to <strong>0</strong> to show the full library poster set.</small>
+                  <small id="numberOnDemandHelp" class="form-text text-muted">When Recently Added days is <strong>0</strong>: random titles per library (0 = full library set). When Recently Added days is <strong>non-zero</strong>: max number of recently-added titles to show (0 = every title in that day window).</small>
                 </div>
 
                 <div class="form-group">
