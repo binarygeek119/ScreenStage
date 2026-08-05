@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Cache-control" content="public">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="<%=baseUrl%>/css/settings-styles.css">
+  <link rel="stylesheet" href="<%=baseUrl%>/css/light.min.css">
+  <link rel="stylesheet" href="<%=baseUrl%>/css/font-awesome.min.css">
+  <title>PosterX — Media Servers</title>
+  <style>
+    .ms-card {
+      border: 1px solid #596280;
+      border-radius: 5px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 1rem;
+      background: #0d111d;
+    }
+    .ms-card h5 {
+      margin-bottom: .75rem;
+      color: #bcd0f7;
+      font-size: 1.05rem;
+    }
+    .ms-card .custom-select {
+      border: 1px solid #596280;
+      border-radius: 2px;
+      font-size: .825rem;
+      background: #0d111d;
+      color: #bcd0f7;
+    }
+    .ms-card .custom-select:focus,
+    .ms-card .form-control:focus {
+      background: #0d111d;
+      color: #bcd0f7;
+      border-color: #7a8bb0;
+      box-shadow: none;
+    }
+    .ms-card .custom-control-label {
+      color: #bcd0f7;
+      padding-left: .15rem;
+    }
+    .ms-toggles .form-group {
+      margin-bottom: .65rem;
+    }
+    .ms-add-btn {
+      border: 1px solid #596280;
+      border-radius: 2px;
+      background: #0d111d;
+      color: #bcd0f7;
+      font-size: .825rem;
+      padding: .35rem .75rem;
+    }
+    .ms-add-btn:hover,
+    .ms-add-btn:focus {
+      background: #151a28;
+      border-color: #7a8bb0;
+      color: #ebf0fa;
+    }
+  </style>
+</head>
+<body>
+  <%if(!user.valid){%><script language='javascript'>window.location.href = '<%=baseUrl%>/logon';</script><%}%>
+  <%- include('new-features-banner.ejs') %>
+  <div class="container">
+    <nav aria-label="breadcrumb" class="main-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">PosterX</a></li>
+        <li class="breadcrumb-item"><a href="<%=baseUrl%>/settings">Settings</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Media Servers</li>
+      </ol>
+    </nav>
+    <div class="row gutters-sm">
+      <div class="col-md-4 d-none d-md-block">
+        <div class="card"><div class="card-body">
+          <nav class="nav flex-column nav-pills nav-gap-y-1">
+            <a href="<%=baseUrl%>/settings" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-cog"></i><span class="menu">Settings</span></a>
+            <a href="<%=baseUrl%>/settings/media-server" class="nav-item nav-link has-icon nav-link-faded active"><i class="fal fa-server"></i><span class="menu">Media Server</span></a>
+            <a href="<%=baseUrl%>/settings/sync" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-sync"></i><span class="menu">Sync</span></a>
+            <a href="<%=baseUrl%>/settings/now-showing" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-film"></i><span class="menu">Now Showing</span></a>
+            <a href="<%=baseUrl%>/settings/ads" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-bullhorn"></i><span class="menu">Ads</span></a>
+            <a href="<%=baseUrl%>/settings/holidays" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-snowflake"></i><span class="menu">Holidays</span></a>
+            <a href="<%=baseUrl%>/settings/tmdb-api" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-key"></i><span class="menu">TMDB API</span></a>
+            <a href="<%=baseUrl%>/settings/cache" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-database"></i><span class="menu">Cache</span></a>
+            <a href="<%=baseUrl%>/debug" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-debug"></i><span class="menu">Debug</span></a>
+            <a href="<%=baseUrl%>/settings#about" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-person-sign"></i><span class="menu">About</span></a>
+          </nav>
+        </div></div>
+      </div>
+      <div class="col-md-8">
+        <div class="card">
+          <div class="d-none d-md-flex border-bottom py-2 px-3 justify-content-end align-items-center flex-wrap">
+            <a href="<%=baseUrl%>/settings#collapseFive" class="nav-link has-icon text-body py-1 mr-3"><i class="fal fa-play"></i><span class="menu">Now Playing</span></a>
+            <a href="<%=baseUrl%>/settings/sync" class="nav-link has-icon text-body py-1"><i class="fal fa-sync"></i><span class="menu">Sync</span></a>
+          </div>
+          <div class="card-header border-bottom mb-3 d-flex d-md-none">
+            <ul class="nav nav-tabs card-header-tabs nav-gap-x-1" role="tablist">
+              <li class="nav-item"><a href="<%=baseUrl%>/settings" class="nav-link has-icon"><i class="fal fa-cog"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/media-server" class="nav-link has-icon active"><i class="fal fa-server"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/sync" class="nav-link has-icon"><i class="fal fa-sync"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/cache" class="nav-link has-icon"><i class="fal fa-database"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/now-showing" class="nav-link has-icon"><i class="fal fa-film"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/ads" class="nav-link has-icon"><i class="fal fa-bullhorn"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/holidays" class="nav-link has-icon"><i class="fal fa-snowflake"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings#collapseFive" class="nav-link has-icon"><i class="fal fa-play"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/tmdb-api" class="nav-link has-icon"><i class="fal fa-key"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/debug" class="nav-link has-icon"><i class="fal fa-debug"></i></a></li>
+              <li class="nav-item ml-auto"><a href="<%=baseUrl%>/settings#about" class="nav-link has-icon"><i class="fal fa-person-sign"></i></a></li>
+            </ul>
+          </div>
+          <div class="card-body">
+          <h4 class="mb-2">Media Servers</h4>
+          <p class="small text-muted">Add up to 10 of each type (Plex, Jellyfin, Emby, Kodi). Zero servers is fine — posters come from the cache (*arr and sync fill it). <strong>Enabled</strong> allows sync/Now Playing; <strong>Display</strong> includes that server’s cached posters in the slideshow.</p>
+          <% if (notice && notice.text) { %>
+            <div class="alert <%= notice.ok ? 'alert-success' : 'alert-danger' %>"><%= notice.text %></div>
+          <% } %>
+          <% if (typeof cacheClearNotice !== 'undefined' && cacheClearNotice && cacheClearNotice.text) { %>
+            <div class="alert <%= cacheClearNotice.ok ? 'alert-success' : 'alert-danger' %>"><%= cacheClearNotice.text %></div>
+          <% } %>
+
+          <form method="post" action="<%=baseUrl%>/settings/media-server" id="mediaServersForm">
+            <input type="hidden" name="mediaServersJson" id="mediaServersJson" value="">
+            <input type="hidden" name="clearCacheServerIds" id="clearCacheServerIds" value="">
+            <div id="mediaServerList"></div>
+            <button type="button" class="btn btn-sm mb-3 ms-add-btn" id="addMediaServerBtn">
+              Add media server&nbsp;+
+            </button>
+
+            <hr>
+            <h5 class="mb-3">Poster cache (global)</h5>
+            <p class="small text-muted">Sync fills the cache; the slideshow reads from it. Clearing all cache is under Settings → Cache / Clear below.</p>
+            <div class="form-group">
+              <label for="posterCacheRefreshMins">Refresh poster DB &amp; images every (minutes)</label>
+              <input type="number" class="form-control" style="max-width: 8rem;" name="posterCacheRefreshMins" id="posterCacheRefreshMins" min="0" step="1"
+                value="<%= (settings.posterCacheRefreshMins != null ? settings.posterCacheRefreshMins : 0) %>">
+            </div>
+            <div class="form-group">
+              <label for="posterCacheMinAgeBeforeChangeCheckMins">Minimum cache age before change checks (minutes)</label>
+              <input type="number" class="form-control" style="max-width: 8rem;" name="posterCacheMinAgeBeforeChangeCheckMins" id="posterCacheMinAgeBeforeChangeCheckMins" min="0" step="1"
+                value="<%= (settings.posterCacheMinAgeBeforeChangeCheckMins != null ? settings.posterCacheMinAgeBeforeChangeCheckMins : 0) %>">
+            </div>
+            <div class="form-group">
+              <div class="custom-control custom-control-nolabel custom-switch">
+                <input type="checkbox" class="custom-control-input" name="preferCachedPosters" id="preferCachedPosters" value="true"
+                  <%=(settings.preferCachedPosters != 'false') ? 'checked' : '' %>>
+                <label class="custom-control-label" for="preferCachedPosters">Prefer cached poster library (recommended)</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="cachedPosterSlideCount">Cached poster slide count</label>
+              <input type="number" class="form-control" style="max-width: 10rem;" name="cachedPosterSlideCount" id="cachedPosterSlideCount" min="1" step="1"
+                value="<%= (settings.cachedPosterSlideCount != null ? settings.cachedPosterSlideCount : 48) %>">
+            </div>
+            <p class="form-text text-muted mb-2">Clear all removes every cached image and the poster metadata database.</p>
+            <button type="submit" class="btn btn-outline-warning btn-sm d-inline mb-3"
+              formaction="<%=baseUrl%>/settings/clear-poster-cache"
+              formmethod="post"
+              onclick="return confirm('Clear ALL cached poster images and metadata? This cannot be undone.');">Clear all poster cache &amp; metadata</button>
+
+            <div class="mb-3">
+              <p class="small text-muted mb-1">Clear only *arr-sourced cache rows/images:</p>
+              <button type="submit" class="btn btn-outline-secondary btn-sm mr-1 mb-1" formaction="<%=baseUrl%>/settings/media-server/clear-arr-cache" name="arrKind" value="sonarr"
+                onclick="return confirm('Clear Sonarr cached posters?');">Clear Sonarr cache</button>
+              <button type="submit" class="btn btn-outline-secondary btn-sm mr-1 mb-1" formaction="<%=baseUrl%>/settings/media-server/clear-arr-cache" name="arrKind" value="radarr"
+                onclick="return confirm('Clear Radarr cached posters?');">Clear Radarr cache</button>
+              <button type="submit" class="btn btn-outline-secondary btn-sm mr-1 mb-1" formaction="<%=baseUrl%>/settings/media-server/clear-arr-cache" name="arrKind" value="lidarr"
+                onclick="return confirm('Clear Lidarr cached posters?');">Clear Lidarr cache</button>
+              <button type="submit" class="btn btn-outline-secondary btn-sm mr-1 mb-1" formaction="<%=baseUrl%>/settings/media-server/clear-arr-cache" name="arrKind" value="readarr"
+                onclick="return confirm('Clear Readarr/Chaptarr cached posters?');">Clear Readarr cache</button>
+            </div>
+
+            <div>
+              <button type="submit" class="btn btn-primary" id="saveMediaServersBtn">Save</button>
+            </div>
+          </form>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  var MAX_PER = 10;
+  var TYPES = ["plex", "jellyfin", "emby", "kodi"];
+  var defaults = { plex: 32400, jellyfin: 8096, emby: 8096, kodi: 8080 };
+  var initial = <%- JSON.stringify(Array.isArray(settings.mediaServers) ? settings.mediaServers : []) %>;
+  var listEl = document.getElementById("mediaServerList");
+  var clearIds = [];
+
+  function uid() {
+    return "ms-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9);
+  }
+
+  function countType(arr, type) {
+    return arr.filter(function (s) { return s.type === type; }).length;
+  }
+
+  function normalize(s) {
+    s = s || {};
+    return {
+      id: s.id || uid(),
+      type: TYPES.indexOf(s.type) >= 0 ? s.type : "plex",
+      name: s.name || "",
+      https: s.https === "true" || s.https === true,
+      host: s.host || "",
+      port: parseInt(s.port, 10) || defaults[s.type || "plex"] || 32400,
+      token: s.token || "",
+      enabled: s.enabled !== "false" && s.enabled !== false,
+      display: s.display !== "false" && s.display !== false,
+      enableNowPlaying: s.enableNowPlaying !== "false" && s.enableNowPlaying !== false,
+      enableOnDemand: s.enableOnDemand !== "false" && s.enableOnDemand !== false,
+      enableSync: s.enableSync !== "false" && s.enableSync !== false,
+      libraries: s.libraries || "",
+      libraries3d: s.libraries3d || ""
+    };
+  }
+
+  var servers = (initial || []).map(normalize);
+
+  function render() {
+    listEl.innerHTML = "";
+    if (!servers.length) {
+      listEl.innerHTML = '<p class="text-muted small">No media servers configured. Click Add media server, or leave empty to use cache / *arr only.</p>';
+      return;
+    }
+    servers.forEach(function (s, idx) {
+      var card = document.createElement("div");
+      card.className = "ms-card";
+      card.dataset.idx = String(idx);
+      card.innerHTML =
+        '<div class="d-flex justify-content-between align-items-start">' +
+        "<h5>Server " + (idx + 1) + "</h5>" +
+        '<button type="button" class="btn btn-sm btn-outline-danger ms-remove">Remove</button></div>' +
+        '<div class="form-row">' +
+        '<div class="form-group col-md-4"><label>Type</label>' +
+        '<select class="custom-select ms-type">' +
+        TYPES.map(function (t) {
+          return '<option value="' + t + '"' + (s.type === t ? " selected" : "") + ">" + t.charAt(0).toUpperCase() + t.slice(1) + "</option>";
+        }).join("") +
+        "</select></div>" +
+        '<div class="form-group col-md-8"><label>Name</label>' +
+        '<input type="text" class="form-control ms-name" value="' + (s.name || "").replace(/"/g, "&quot;") + '" placeholder="Optional label"></div></div>' +
+        '<div class="form-row">' +
+        '<div class="form-group col-md-6"><label>Host</label>' +
+        '<input type="text" class="form-control ms-host" value="' + (s.host || "").replace(/"/g, "&quot;") + '"></div>' +
+        '<div class="form-group col-md-3"><label>Port</label>' +
+        '<input type="number" class="form-control ms-port" value="' + s.port + '"></div>' +
+        '<div class="form-group col-md-3"><label class="d-block">&nbsp;</label>' +
+        '<div class="custom-control custom-switch">' +
+        '<input type="checkbox" class="custom-control-input ms-https" id="https' + idx + '"' + (s.https ? " checked" : "") + ">" +
+        '<label class="custom-control-label" for="https' + idx + '">HTTPS</label></div></div></div>' +
+        '<div class="form-group"><label>Token / API key</label>' +
+        '<input type="password" class="form-control ms-token" value="' + (s.token || "").replace(/"/g, "&quot;") + '" autocomplete="off">' +
+        '<small class="form-text text-muted">Optional for Kodi without HTTP auth.</small></div>' +
+        '<div class="form-row ms-toggles">' +
+        ["enabled|Enabled", "display|Display", "enableNowPlaying|Now Playing", "enableSync|Sync", "enableOnDemand|On-demand libs"].map(function (pair) {
+          var p = pair.split("|");
+          var key = p[0], lab = p[1];
+          return '<div class="form-group col-6 col-md-4 col-lg"><div class="custom-control custom-switch">' +
+            '<input type="checkbox" class="custom-control-input ms-' + key + '" id="' + key + idx + '"' + (s[key] ? " checked" : "") + ">" +
+            '<label class="custom-control-label" for="' + key + idx + '">' + lab + "</label></div></div>";
+        }).join("") +
+        "</div>" +
+        '<div class="form-group"><label>Libraries to sync (comma-separated names)</label>' +
+        '<input type="text" class="form-control ms-libraries" value="' + (s.libraries || "").replace(/"/g, "&quot;") + '" placeholder="Movies, TV Shows">' +
+        "</div>" +
+        '<div class="form-group mb-0"><label>3D libraries (optional)</label>' +
+        '<input type="text" class="form-control ms-libraries3d" value="' + (s.libraries3d || "").replace(/"/g, "&quot;") + '"></div>';
+      listEl.appendChild(card);
+    });
+  }
+
+  function readDom() {
+    var cards = listEl.querySelectorAll(".ms-card");
+    var out = [];
+    cards.forEach(function (card) {
+      var idx = parseInt(card.dataset.idx, 10);
+      var prev = servers[idx] || {};
+      out.push(normalize({
+        id: prev.id,
+        type: card.querySelector(".ms-type").value,
+        name: card.querySelector(".ms-name").value,
+        host: card.querySelector(".ms-host").value,
+        port: card.querySelector(".ms-port").value,
+        token: card.querySelector(".ms-token").value,
+        https: card.querySelector(".ms-https").checked,
+        enabled: card.querySelector(".ms-enabled").checked,
+        display: card.querySelector(".ms-display").checked,
+        enableNowPlaying: card.querySelector(".ms-enableNowPlaying").checked,
+        enableSync: card.querySelector(".ms-enableSync").checked,
+        enableOnDemand: card.querySelector(".ms-enableOnDemand").checked,
+        libraries: card.querySelector(".ms-libraries").value,
+        libraries3d: card.querySelector(".ms-libraries3d").value
+      }));
+    });
+    servers = out;
+    return out;
+  }
+
+  document.getElementById("addMediaServerBtn").addEventListener("click", function () {
+    readDom();
+    var type = "plex";
+    for (var i = 0; i < TYPES.length; i++) {
+      if (countType(servers, TYPES[i]) < MAX_PER) { type = TYPES[i]; break; }
+    }
+    if (countType(servers, type) >= MAX_PER) {
+      alert("At most " + MAX_PER + " servers of each type are allowed.");
+      return;
+    }
+    servers.push(normalize({ type: type, enabled: true, display: true }));
+    render();
+  });
+
+  listEl.addEventListener("click", function (ev) {
+    if (!ev.target.classList.contains("ms-remove") && !ev.target.closest(".ms-remove")) return;
+    var card = ev.target.closest(".ms-card");
+    if (!card) return;
+    readDom();
+    var idx = parseInt(card.dataset.idx, 10);
+    var removed = servers[idx];
+    if (!removed) return;
+    var clear = confirm("Also clear cached posters and images for this server?\n\nOK = Yes, clear cache\nCancel = No, keep cache");
+    if (clear && removed.id) clearIds.push(removed.id);
+    servers.splice(idx, 1);
+    render();
+  });
+
+  listEl.addEventListener("change", function (ev) {
+    if (!ev.target.classList.contains("ms-type")) return;
+    var card = ev.target.closest(".ms-card");
+    if (!card) return;
+    var type = ev.target.value;
+    var portInput = card.querySelector(".ms-port");
+    if (portInput && defaults[type]) {
+      portInput.value = defaults[type];
+    }
+  });
+
+  document.getElementById("mediaServersForm").addEventListener("submit", function (ev) {
+    if (ev.submitter && ev.submitter.getAttribute("formaction")) return;
+    readDom();
+    var counts = { plex: 0, jellyfin: 0, emby: 0, kodi: 0 };
+    servers.forEach(function (s) { counts[s.type] = (counts[s.type] || 0) + 1; });
+    for (var t in counts) {
+      if (counts[t] > MAX_PER) {
+        ev.preventDefault();
+        alert("At most " + MAX_PER + " " + t + " servers are allowed.");
+        return;
+      }
+    }
+    var payload = servers.map(function (s) {
+      return {
+        id: s.id,
+        type: s.type,
+        name: s.name,
+        https: s.https ? "true" : "false",
+        host: s.host,
+        port: s.port,
+        token: s.token,
+        enabled: s.enabled ? "true" : "false",
+        display: s.display ? "true" : "false",
+        enableNowPlaying: s.enableNowPlaying ? "true" : "false",
+        enableOnDemand: s.enableOnDemand ? "true" : "false",
+        enableSync: s.enableSync ? "true" : "false",
+        libraries: s.libraries,
+        libraries3d: s.libraries3d
+      };
+    });
+    document.getElementById("mediaServersJson").value = JSON.stringify(payload);
+    document.getElementById("clearCacheServerIds").value = clearIds.join(",");
+  });
+
+  render();
+})();
+  </script>
+</body>
+</html>

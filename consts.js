@@ -6,15 +6,22 @@ const DEFAULT_SETTINGS = {
   fade : "true",
   hideSettingsLinks : "false",
   theaterRoomMode : "false",
+  /** @deprecated Prefer mediaServers[]; kept for migration / legacy flat sync. */
   mediaServerType : "plex",
   plexIP : "",
   plexHTTPS : "false",
   plexPort : 32400,
   plexToken : "",
+  /**
+   * Multi media-server connections (plex/jellyfin/emby/kodi). Up to 10 of each type.
+   * Empty array = no media servers (*arr / cache only).
+   */
+  mediaServers : [],
   pinNS : "false",
   hideUser: "false",
+  /** @deprecated Prefer per-server mediaServers[].libraries */
   onDemandLibraries : "",
-  /** On-demand library names that should be marked as 3D (comma-separated). */
+  /** On-demand library names that should be marked as 3D (comma-separated). @deprecated Prefer per-server libraries3d */
   onDemand3dLibraries : "",
   numberOnDemand : 2,
   onDemandRefresh : 30,
