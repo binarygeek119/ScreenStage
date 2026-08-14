@@ -30,7 +30,7 @@
 div {
   margin-left: 70px;
   margin-right: 70px;
-color: whitesmoke;
+  color: rgba(255, 255, 255, 0.87);
 }
     </style>
 </head>
@@ -39,7 +39,7 @@ color: whitesmoke;
 
 
     <br class="container d-flex align-items-center justify-content-center no-content" style="position: fixed; position: 50%,50%">
-        <div style="color: lightgoldenrodyellow;">
+        <div>
             <h1>ScreenStage Settings</h1>
             <p class="lead">Media display software for Plex, Jellyfin, Emby, Kodi, Sonarr, Radarr, Lidarr, and Readarr.</p>
             <p class="small"><a href="https://discord.gg/AEhVjqX4Af" target="_blank" rel="noopener noreferrer">ScreenStage Discord (support)</a></p>
@@ -52,8 +52,8 @@ color: whitesmoke;
                     placeholder="Enter a password" value="" style="width: 200px">
             </div>
             <div>
-            <button type="submit" class="btn btn-info" >GO</button>
-            <button type="reset" class="btn btn-info" onclick="location.href = '<%=baseUrl%>/';">Return</button>
+            <button type="submit" class="btn btn-primary">GO</button>
+            <button type="reset" class="btn btn-secondary" onclick="location.href = '<%=baseUrl%>/';">Return</button>
             <small id="passwordHelp" class="form-text text-muted">If you have forgetten the password, please
                 review the /config/settings.json file</small>
             </div>
