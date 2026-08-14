@@ -4,8 +4,8 @@
 version: "3.8"
 
 services:
-  posterr:
-    image: posterrx
+  screenstage:
+    image: screenstage
     build:
       context: .
       dockerfile: ./Dockerfile

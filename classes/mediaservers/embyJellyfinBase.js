@@ -399,7 +399,7 @@ class EmbyJellyfinBase {
   _mediaBrowserAuthorizationHeader(key) {
     const ver = (posterrPackage && posterrPackage.version) || "1.0";
     const tok = String(key).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    return `MediaBrowser Client="PosterX", Device="PosterX", DeviceId="posterx", Version="${ver}", Token="${tok}"`;
+    return `MediaBrowser Client="ScreenStage", Device="ScreenStage", DeviceId="screenstage", Version="${ver}", Token="${tok}"`;
   }
 
   /**
@@ -472,7 +472,7 @@ class EmbyJellyfinBase {
         : "";
     if (!key) {
       throw new Error(
-        `${this.appName}: no API key in settings. Create one in the server dashboard (Jellyfin: Dashboard → API Keys) and paste it into PosterX’s server token field.`
+        `${this.appName}: no API key in settings. Create one in the server dashboard (Jellyfin: Dashboard → API Keys) and paste it into ScreenStage’s server token field.`
       );
     }
     const params = { ...(options.params || {}) };
@@ -526,9 +526,9 @@ class EmbyJellyfinBase {
         const status = e.response && e.response.status;
         if (status === 401) {
           if (this._usesLegacyEmbyTokenQueryAuth()) {
-            e.message += ` | ${this.appName}: HTTP 401 — wrong or revoked API key, or the key lacks access. Regenerate the key in the server dashboard and update PosterX. If you use a reverse proxy, ensure it forwards the X-Emby-Token header (PosterX also sends api_key on the query string).`;
+            e.message += ` | ${this.appName}: HTTP 401 — wrong or revoked API key, or the key lacks access. Regenerate the key in the server dashboard and update ScreenStage. If you use a reverse proxy, ensure it forwards the X-Emby-Token header (ScreenStage also sends api_key on the query string).`;
           } else {
-            e.message += ` | Jellyfin: HTTP 401 — invalid or revoked API key (Dashboard → API Keys), or the server blocked the request. PosterX uses Authorization: MediaBrowser (required on Jellyfin 10.11+ when legacy X-Emby-Token is disabled). Ensure your reverse proxy forwards the Authorization header if you use one.`;
+            e.message += ` | Jellyfin: HTTP 401 — invalid or revoked API key (Dashboard → API Keys), or the server blocked the request. ScreenStage uses Authorization: MediaBrowser (required on Jellyfin 10.11+ when legacy X-Emby-Token is disabled). Ensure your reverse proxy forwards the Authorization header if you use one.`;
           }
         }
         const d = e.response && e.response.data;

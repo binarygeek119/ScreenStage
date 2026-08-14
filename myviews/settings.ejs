@@ -2,7 +2,7 @@
 <html lang="en">
 <!--
 ***********************************************************
-* PosterX - Your home media display                       *
+* ScreenStage - Your home media display                       *
 * Developed by Matt Petersen - Brisbane, Australia        *
 ***********************************************************
 -->
@@ -28,7 +28,7 @@
   <!-- <link rel="stylesheet" href="<%=baseUrl%>/css/bootstrap-colourpicker.min.css"> -->
   <!-- <script src="/js/script.js"></script> -->
 
-  <title>PosterX - Settings</title>
+  <title>ScreenStage - Settings</title>
   <link rel="shortcut icon" type="image/png" href="<%=baseUrl%>/favicons/favicon.ico" />
 </head>
 
@@ -43,14 +43,14 @@
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="main-breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">PosterX</a></li>
-  <li class="breadcrumb-item active" aria-current="page">PosterX Settings</li>
+        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">ScreenStage</a></li>
+  <li class="breadcrumb-item active" aria-current="page">ScreenStage Settings</li>
   </ol>
   </nav>
   <% if (typeof showNewFeaturesBanner !== 'undefined' && showNewFeaturesBanner && user && user.valid) { %>
   <div class="card border-danger mb-3">
     <div class="card-body">
-      <p class="mb-2">PosterX <strong>v<%= typeof appVersion !== 'undefined' ? appVersion : '' %></strong> includes changes you have not acknowledged yet. The red banner appears on the main display and other pages until you confirm below.</p>
+      <p class="mb-2">ScreenStage <strong>v<%= typeof appVersion !== 'undefined' ? appVersion : '' %></strong> includes changes you have not acknowledged yet. The red banner appears on the main display and other pages until you confirm below.</p>
       <form method="post" action="<%= baseUrl %>/settings/new-features-acknowledge">
         <button type="submit" class="btn btn-danger">Acknowledge there are new features</button>
       </form>
@@ -58,7 +58,7 @@
   </div>
   <% } %>
   <%if(typeof formData !== 'undefined' && formData.saved == true) {%><script language='javascript'>
-    alert("PosterX Settings Saved. Please allow a few seconds for PosterX to restart.");
+    alert("ScreenStage Settings Saved. Please allow a few seconds for ScreenStage to restart.");
   </script><%}%>
   <%if(typeof cacheClearNotice !== 'undefined' && cacheClearNotice && cacheClearNotice.text) {%><script>
     alert(<%- JSON.stringify(cacheClearNotice.text) %>);
@@ -166,7 +166,7 @@
 
       </div>
       <% if(latestVersion !== undefined && latestVersion !== "" && latestVersion !== version.toString() && (typeof errors == 'undefined' || errors.length == 0) && updateAvailable == true){%>
-      <p id="rcorners-u"><span id="message">Update</span><br>Please upgrade to PosterX v<%=latestVersion%></br>
+      <p id="rcorners-u"><span id="message">Update</span><br>Please upgrade to ScreenStage v<%=latestVersion%></br>
       <%}%>
 
                   <!-- show validation errors -->
@@ -387,7 +387,7 @@
                     <input type="checkbox" class="custom-control-input" name="theaterRoomMode" id="theaterRoomMode"
                      value="true" <% if(typeof formData !== 'undefined' && errors){%><%=formData.theaterRoomMode ? 'checked' : '' %><%}else{%><%=(settings.theaterRoomMode == 'true') ? 'checked' : '' %><%}%>>
                     <label class="custom-control-label" for="theaterRoomMode">Theatre room mode</label>
-                    <small id="theaterRoomModeHelp" class="form-text text-muted">PosterX sleeps whenever anything playing (Requires 'Now Playing' enabled)</small>
+                    <small id="theaterRoomModeHelp" class="form-text text-muted">ScreenStage sleeps whenever anything playing (Requires 'Now Playing' enabled)</small>
                   </div>
                 </div>
                 
@@ -420,14 +420,14 @@
                   <label for="sleepStart">Sleep start time</label>
                   <input type="text" class="form-control" id="sleepStart" name="sleepStart" aria-describedby="sleepStart"
                     placeholder="23:00 (military time)" value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.sleepStart%>"<%}else{%><%=settings.sleepStart%>"<%}%>>
-                  <small id="sleepStartHelp" class="form-text text-muted">The time to put PosterX to sleep</small>
+                  <small id="sleepStartHelp" class="form-text text-muted">The time to put ScreenStage to sleep</small>
                 </div>
 
                 <div class="form-group">
                   <label for="sleepEnd">Sleep end time</label>
                   <input type="text" class="form-control" id="sleepEnd" name="sleepEnd" aria-describedby="sleepEnd"
                     placeholder="07:00 (military time)" value="<% if(typeof formData !== 'undefined' && errors){%><%=formData.sleepEnd%>"<%}else{%><%=settings.sleepEnd%>"<%}%>>
-                  <small id="sleepEndHelp" class="form-text text-muted">The time to wake PosterX up</small>
+                  <small id="sleepEndHelp" class="form-text text-muted">The time to wake ScreenStage up</small>
                 </div>
 
                 </div>
@@ -724,7 +724,7 @@
                     <input type="checkbox" class="custom-control-input" name="enableCustomPictures" id="enableCustomPictures" aria-describedby="enableCustomPicturesHelp" 
                       value="true" <% if(typeof formData !== 'undefined' && errors){%><%=formData.enableCustomPictures ? 'checked' : '' %><%}else{%><%=(settings.enableCustomPictures == 'true') ? 'checked' : '' %><%}%>>
                     <label class="custom-control-label" for="enableCustomPictures">Enabled</label>
-                    <small id="enableCustomPicturesHelp" class="form-text text-muted">(Uses .jpg files placed in './posterr/custom' folder)</small>
+                    <small id="enableCustomPicturesHelp" class="form-text text-muted">(Uses .jpg files placed in './screenstage/custom' folder)</small>
                   </div>
                 </div>
 
@@ -1368,11 +1368,11 @@
 
                   <!-- About -->
                   <div class="tab-pane" id="about">
-                    <h5>ABOUT POSTERX <span class="text-muted font-weight-normal">v<%= version %></span></h5>
+                    <h5>ABOUT SCREENSTAGE <span class="text-muted font-weight-normal">v<%= version %></span></h5>
                     <div class="alert alert-secondary mb-3" role="note">
-                      <p class="mb-1"><strong>PosterX</strong> is a fork of <a href="https://github.com/petersem/posterr" target="_blank" rel="noopener noreferrer">Posterr</a> (Matt Petersen). This build is maintained by <strong>binarygeek119</strong>.</p>
-                      <p class="mb-1 small"><a href="https://github.com/binarygeek119/posterrX" target="_blank" rel="noopener noreferrer">GitHub — binarygeek119/posterrX</a></p>
-                      <p class="mb-1 small">Sister project: <a href="https://github.com/binarygeek119/ubuntudisplayos" target="_blank" rel="noopener noreferrer">binarygeek119/ubuntudisplayos</a> — Ubuntu-based multi-display kiosk hosts that pair well with PosterX.</p>
+                      <p class="mb-1"><strong>ScreenStage</strong> is a fork of <a href="https://github.com/petersem/posterr" target="_blank" rel="noopener noreferrer">Posterr</a> (Matt Petersen). This build is maintained by <strong>binarygeek119</strong>.</p>
+                      <p class="mb-1 small"><a href="https://github.com/binarygeek119/ScreenStage" target="_blank" rel="noopener noreferrer">GitHub — binarygeek119/ScreenStage</a></p>
+                      <p class="mb-1 small">Sister project: <a href="https://github.com/binarygeek119/ubuntudisplayos" target="_blank" rel="noopener noreferrer">binarygeek119/ubuntudisplayos</a> — Ubuntu-based multi-display kiosk hosts that pair well with ScreenStage.</p>
                       <p class="mb-0 small text-muted">This fork is purely AI-modified.</p>
                     </div>
                     <p><b>Support my efforts and continued development.</b></br> <a
@@ -1400,21 +1400,21 @@
                     <label class="d-block" style="text-decoration: underline;">Project Details</label>
                     <p>
                       <ul>
-                        <li>PosterX maintainer Discord (this fork): <a href="https://discord.gg/AEhVjqX4Af"
+                        <li>ScreenStage maintainer Discord (this fork): <a href="https://discord.gg/AEhVjqX4Af"
                             target="_blank" rel="noopener noreferrer">https://discord.gg/AEhVjqX4Af</a></li>
                         <li>Original Posterr community Discord: <a href="https://discord.gg/TcnEkMEf9J"
                             target="_blank" rel="noopener noreferrer">https://discord.gg/TcnEkMEf9J</a></li>
-                        <li>Do not ask the original Posterr developer for support when using PosterX.</li>
-                        <li>For fork support, use GitHub: <a href="https://github.com/binarygeek119/posterrX" target="_blank" rel="noopener noreferrer">https://github.com/binarygeek119/posterrX</a></li>
+                        <li>Do not ask the original Posterr developer for support when using ScreenStage.</li>
+                        <li>For fork support, use GitHub: <a href="https://github.com/binarygeek119/ScreenStage" target="_blank" rel="noopener noreferrer">https://github.com/binarygeek119/ScreenStage</a></li>
                         <li>Sister project (kiosk displays): <a href="https://github.com/binarygeek119/ubuntudisplayos" target="_blank" rel="noopener noreferrer">https://github.com/binarygeek119/ubuntudisplayos</a></li>
                         <li>Upstream GitHub repository: <a href="https://github.com/petersem/posterr" target="_blank" rel="noopener noreferrer">petersem/posterr</a>
                         </li>
-                        <li>Docker image (PosterX): <a href="https://hub.docker.com/r/binarygeek119/posterrx"
-                            target="_blank" rel="noopener noreferrer">binarygeek119/posterrx</a> (Docker Hub names are lowercase)</li>
+                        <li>Docker image (ScreenStage): <a href="https://hub.docker.com/r/binarygeek119/screenstage"
+                            target="_blank" rel="noopener noreferrer">binarygeek119/screenstage</a> (Docker Hub names are lowercase)</li>
                       </ul>
                     </p>
                     <label class="d-block" style="text-decoration: underline;">Disclaimer</label>
-                    <p class="small">PosterX is dependant on third party applications and services. Some features may fail temporarily or permenantly if the dependancies are unavailable, or become incompatible for any technical or legal reason. This software comes with no warranty or guarantee of any kind. Images and themes that you download through PosterX may be copyrighted, and are the property of the respective copyright holders.</p>
+                    <p class="small">ScreenStage is dependant on third party applications and services. Some features may fail temporarily or permenantly if the dependancies are unavailable, or become incompatible for any technical or legal reason. This software comes with no warranty or guarantee of any kind. Images and themes that you download through ScreenStage may be copyrighted, and are the property of the respective copyright holders.</p>
                   </div>
                 </div>
               </div>

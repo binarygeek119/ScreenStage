@@ -1,7 +1,7 @@
 {
-  "name": "posterx",
+  "name": "screenstage",
   "version": "2.1.0",
-  "description": "PosterX — digital media display (fork of Posterr)",
+  "description": "ScreenStage — digital media display (fork of Posterr)",
   "main": "index.js",
   "bin": "index.js",
   "pkg": {

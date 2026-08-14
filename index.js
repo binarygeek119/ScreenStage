@@ -75,7 +75,7 @@ if(args.length == 2){
 }
 
 console.log("-------------------------------------------------------");
-console.log(" POSTERX - Your media display");
+console.log(" SCREENSTAGE - Your media display");
 console.log(" Developed by Matt Petersen - Brisbane Australia");
 console.log(" ");
 console.log(" Version: " + pjson.version);
@@ -424,7 +424,7 @@ if (!fs.existsSync(dir)) {
   fs.mkdirSync(dir);
 }
 
-// Prevent multiple PosterX processes from running at the same time.
+// Prevent multiple ScreenStage processes from running at the same time.
 const APP_LOCK_FILE = path.join(CONFIG_ROOT, "posterr-app.lock");
 let appLockHeld = false;
 
@@ -472,13 +472,13 @@ function acquireAppLockOrExit() {
           appLockHeld = true;
           console.log(
             new Date().toLocaleString() +
-              " PosterX: removed stale process lock and continued startup"
+              " ScreenStage: removed stale process lock and continued startup"
           );
           return;
         }
         console.log(
           new Date().toLocaleString() +
-            " ✘✘ WARNING ✘✘ - Another PosterX instance is already running (pid " +
+            " ✘✘ WARNING ✘✘ - Another ScreenStage instance is already running (pid " +
             lockPid +
             "). Exiting this process."
         );
@@ -3575,7 +3575,7 @@ async function startup(clearCache) {
       console.log("");
     }
     else {
-      console.log("*** You are running the latest version of PosterX ***");
+      console.log("*** You are running the latest version of ScreenStage ***");
       console.log("");
     }
   }
@@ -4873,7 +4873,7 @@ app.get(BASEURL + "/ads/data", (req, res) => {
   }
 });
 
-// Used by the web client to check connection status to PosterX, and also to determine if there was a cold start that was missed
+// Used by the web client to check connection status to ScreenStage, and also to determine if there was a cold start that was missed
 
 app.get(BASEURL + "/conncheck", (req, res) => {
   res.send({ "status": cold_start_time, "sleep": sleep });
