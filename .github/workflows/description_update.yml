@@ -38,10 +38,5 @@ jobs:
             org.opencontainers.image.title=ScreenStage
           tags: |
             ghcr.io/binarygeek119/screenstage:latest
+            ghcr.io/binarygeek119/screenstage:master
             ghcr.io/binarygeek119/screenstage:${{ github.run_number }}
-      - name: Run a one-line script
-        run: echo Hello, world!
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
