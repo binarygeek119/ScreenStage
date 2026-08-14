@@ -1,4 +1,4 @@
-name: Build Docker image and then push to DockerHub
+name: Build Docker image and then push to GHCR
 on:
   push:
     branches: [ master ]
@@ -8,31 +8,35 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-container:
     name: Build container
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/binarygeek119/ScreenStage
+            org.opencontainers.image.title=ScreenStage
           tags: |
-            binarygeek119/screenstage:latest
-            binarygeek119/screenstage:${{ github.run_number }}
-      - name: Run a one-line script
-        run: echo Hello, world!
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+            ghcr.io/binarygeek119/screenstage:latest
+            ghcr.io/binarygeek119/screenstage:master
+            ghcr.io/binarygeek119/screenstage:${{ github.run_number }}
