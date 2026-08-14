@@ -3,14 +3,13 @@
 
 > **About this repository**  
 > **ScreenStage** is an **AI-assisted fork** of [Posterr](https://github.com/petersem/posterr) by **binarygeek119**. Upstream owns the original design and core product; this repo adds the features in **New in this fork** below.  
-> **Source:** [github.com/binarygeek119/ScreenStage](https://github.com/binarygeek119/ScreenStage) · **Docker image:** [`binarygeek119/screenstage`](https://hub.docker.com/r/binarygeek119/screenstage) (`:latest` / `:testing` from CI)
+> **Source:** [github.com/binarygeek119/ScreenStage](https://github.com/binarygeek119/ScreenStage) · **Docker image:** [`ghcr.io/binarygeek119/screenstage`](https://github.com/binarygeek119/ScreenStage/pkgs/container/screenstage) (`:latest` / `:testing` from CI)
 > **Sister project:** [binarygeek119/ubuntudisplayos](https://github.com/binarygeek119/ubuntudisplayos) for Ubuntu-based multi-display kiosk hosts that pair well with ScreenStage.
 
 ![GitHub stars](https://img.shields.io/github/stars/binarygeek119/ScreenStage?style=flat)
 ![Fork version](https://img.shields.io/github/package-json/v/binarygeek119/ScreenStage?label=version&logoColor=blue)
 ![Last commit](https://img.shields.io/github/last-commit/binarygeek119/ScreenStage)
-![Docker Pulls](https://img.shields.io/docker/pulls/binarygeek119/screenstage)
-![Docker image size](https://img.shields.io/docker/image-size/binarygeek119/screenstage/latest?logo=docker)
+[![GHCR](https://img.shields.io/badge/ghcr.io-binarygeek119%2Fscreenstage-blue?logo=github)](https://github.com/binarygeek119/ScreenStage/pkgs/container/screenstage)
 ![Platforms](https://img.shields.io/badge/platform-docker-blue)
 [![Upstream wiki](https://img.shields.io/badge/upstream-wiki-informational?logo=github)](https://github.com/petersem/posterr/wiki/Posterr-Configuration)
 
@@ -104,7 +103,7 @@ Create the following directories in your docker folder:
 ```yaml
 services:
   screenstage:
-    image: binarygeek119/screenstage:latest
+    image: ghcr.io/binarygeek119/screenstage:latest
     container_name: screenstage
     environment:
       TZ: Australia/Brisbane
@@ -170,7 +169,7 @@ docker run -d --name screenstage \
 -e TZ=Australia/Brisbane \
 --add-host=host.docker.internal:host-gateway \
 --restart=always \
-binarygeek119/screenstage:latest
+ghcr.io/binarygeek119/screenstage:latest
 ```
 
 On **Docker Engine 20.10+**, `--add-host=host.docker.internal:host-gateway` lets ScreenStage reach Plex/Jellyfin/Emby/Kodi running on the **host** (Linux). Omit if you only use container-to-container names on a custom network.
