@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="<%=baseUrl%>/css/settings-styles.css">
   <link rel="stylesheet" href="<%=baseUrl%>/css/light.min.css">
   <link rel="stylesheet" href="<%=baseUrl%>/css/font-awesome.min.css">
-  <title>PosterX — Now Showing Settings</title>
+  <title>ScreenStage — Now Showing Settings</title>
   <link rel="shortcut icon" type="image/png" href="<%=baseUrl%>/favicons/favicon.ico" />
 </head>
 <body>
@@ -20,7 +20,7 @@
   <div class="container">
     <nav aria-label="breadcrumb" class="main-breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">PosterX</a></li>
+        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">ScreenStage</a></li>
         <li class="breadcrumb-item"><a href="<%=baseUrl%>/settings">Settings</a></li>
         <li class="breadcrumb-item active" aria-current="page">Now Showing</li>
       </ol>
@@ -30,6 +30,7 @@
         <div class="card"><div class="card-body">
           <nav class="nav flex-column nav-pills nav-gap-y-1">
             <a href="<%=baseUrl%>/settings" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-cog"></i><span class="menu">Settings</span></a>
+            <a href="<%=baseUrl%>/settings/media-server" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-server"></i><span class="menu">Media Server</span></a>
             <a href="<%=baseUrl%>/settings/sync" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-sync"></i><span class="menu">Sync</span></a>
             <a href="<%=baseUrl%>/settings/now-showing" class="nav-item nav-link has-icon nav-link-faded active"><i class="fal fa-film"></i><span class="menu">Now Showing</span></a>
             <a href="<%=baseUrl%>/settings/ads" class="nav-item nav-link has-icon nav-link-faded"><i class="fal fa-bullhorn"></i><span class="menu">Ads</span></a>
@@ -51,6 +52,7 @@
           <div class="card-header border-bottom mb-3 d-flex d-md-none">
             <ul class="nav nav-tabs card-header-tabs nav-gap-x-1" role="tablist">
               <li class="nav-item"><a href="<%=baseUrl%>/settings" class="nav-link has-icon"><i class="fal fa-cog"></i></a></li>
+              <li class="nav-item"><a href="<%=baseUrl%>/settings/media-server" class="nav-link has-icon"><i class="fal fa-server"></i></a></li>
               <li class="nav-item"><a href="<%=baseUrl%>/settings/sync" class="nav-link has-icon"><i class="fal fa-sync"></i></a></li>
               <li class="nav-item"><a href="<%=baseUrl%>/settings/cache" class="nav-link has-icon"><i class="fal fa-database"></i></a></li>
               <li class="nav-item"><a href="<%=baseUrl%>/settings/now-showing" class="nav-link has-icon active"><i class="fal fa-film"></i></a></li>
@@ -70,7 +72,7 @@
           <p class="small mb-3"><a class="font-weight-bold" href="<%=baseUrl%>/now-showing">Open dedicated Now Showing view</a></p>
           <p class="text-muted small">This page uses its own database and powers the <a href="<%=baseUrl%>/now-showing"><code class="text-primary"><%=baseUrl%>/now-showing</code></a> screen view.</p>
           <h5 class="mt-4">Home poster carousel</h5>
-          <p class="text-muted small mb-3">Optional: show your saved list as slides on the main PosterX page (<code><%=baseUrl%>/</code>). Requires at least one movie below with banner and logo (TMDB).</p>
+          <p class="text-muted small mb-3">Optional: show your saved list as slides on the main ScreenStage page (<code><%=baseUrl%>/</code>). Requires at least one movie below with banner and logo (TMDB).</p>
           <form method="post" action="<%=baseUrl%>/settings/now-showing/screen" class="mb-4 pb-4 border-bottom">
             <div class="form-check mb-2">
               <input type="checkbox" class="form-check-input" id="nsListOnHome" name="enableNowShowingListInPoster" value="true" <%= settings.enableNowShowingListInPoster === "true" ? "checked" : "" %>>

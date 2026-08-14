@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS poster_entries (
   rating_content TEXT NOT NULL DEFAULT '',
   summary TEXT NOT NULL DEFAULT '',
   server_kind TEXT NOT NULL DEFAULT 'plex',
+  server_id TEXT NOT NULL DEFAULT '',
   poster_ar TEXT NOT NULL DEFAULT '',
   dbid TEXT NOT NULL DEFAULT '',
   api_item_id TEXT NOT NULL DEFAULT '',
@@ -63,6 +64,8 @@ CREATE INDEX IF NOT EXISTS idx_poster_server_updated ON poster_entries(server_ki
 CREATE INDEX IF NOT EXISTS idx_poster_server_api ON poster_entries(server_kind, api_item_id);
 CREATE INDEX IF NOT EXISTS idx_poster_server_dbid ON poster_entries(server_kind, dbid);
 `;
+// Indexes on server_id are created in ensurePosterEntriesExtraColumns() after
+// the column is migrated onto existing DBs (CREATE TABLE IF NOT EXISTS won't add it).
 
 /** @type {any} */
 let _sqlDb = null;
@@ -87,7 +90,15 @@ const EXTRA_SCHEMA_COLUMNS = [
   { name: "plot", def: "TEXT NOT NULL DEFAULT ''" },
   { name: "rating_score", def: "TEXT NOT NULL DEFAULT ''" },
   { name: "rating_content", def: "TEXT NOT NULL DEFAULT ''" },
+  { name: "server_id", def: "TEXT NOT NULL DEFAULT ''" },
 ];
+
+const INSERT_COLS = `cache_file, logo_cache_file, art_cache_file, banner_cache_file,
+      portrait_actor_cache_file, portrait_actress_cache_file,
+      portrait_director_cache_file, portrait_author_cache_file, portrait_artist_cache_file,
+      title, tag_line, year, media_type, tags_text, genres, top_cast, actor_1, actor_2, studio, runtime_mins, rating, content_rating, plot, rating_score, rating_content, summary, server_kind, server_id, poster_ar,
+      dbid, api_item_id, library_kind, library_name, source_url, updated_at`;
+const INSERT_PLACEHOLDERS = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
 
 function assertDb() {
   if (!_sqlDb) {
@@ -119,6 +130,16 @@ function ensurePosterEntriesExtraColumns() {
       _sqlDb.run(`ALTER TABLE poster_entries ADD COLUMN ${c.name} ${c.def}`);
       changed = true;
     }
+  }
+  try {
+    _sqlDb.run(
+      "CREATE INDEX IF NOT EXISTS idx_poster_server_id_api ON poster_entries(server_id, api_item_id)"
+    );
+    _sqlDb.run(
+      "CREATE INDEX IF NOT EXISTS idx_poster_server_id_dbid ON poster_entries(server_id, dbid)"
+    );
+  } catch (e) {
+    /* ignore */
   }
   return changed;
 }
@@ -252,7 +273,7 @@ function logLegacySavedImageHint() {
     if (n > 0) return;
     console.log(
       new Date().toLocaleString() +
-        " PosterX: cached images are still under saved/imagecache; move files to config/cache/imagecache (and mp3cache → config/cache/mp3cache), or copy your old saved/ tree into config/cache/."
+        " ScreenStage: cached images are still under saved/imagecache; move files to config/cache/imagecache (and mp3cache → config/cache/mp3cache), or copy your old saved/ tree into config/cache/."
     );
   } catch (e) {
     /* ignore */
@@ -264,15 +285,13 @@ function migrateLegacyJson() {
   const raw = fs.readFileSync(LEGACY_JSON, "utf8");
   const parsed = JSON.parse(raw);
   const entries = parsed && Array.isArray(parsed.entries) ? parsed.entries : [];
-  const ins = _sqlDb.prepare(`
-    INSERT OR REPLACE INTO poster_entries (
-      cache_file, logo_cache_file, art_cache_file, banner_cache_file,
-      portrait_actor_cache_file, portrait_actress_cache_file,
-      portrait_director_cache_file, portrait_author_cache_file, portrait_artist_cache_file,
-      title, tag_line, year, media_type, tags_text, genres, top_cast, actor_1, actor_2, studio, runtime_mins, rating, content_rating, plot, rating_score, rating_content, summary, server_kind, poster_ar,
-      dbid, api_item_id, library_kind, library_name, source_url, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  const ins = _sqlDb.prepare(
+    "INSERT OR REPLACE INTO poster_entries (" +
+      INSERT_COLS +
+      ") VALUES (" +
+      INSERT_PLACEHOLDERS +
+      ")"
+  );
   try {
     _sqlDb.run("BEGIN");
     for (const e of entries) {
@@ -369,6 +388,7 @@ function rowFromDb(r) {
     ratingContent: r.rating_content || r.content_rating || "",
     summary: r.summary || "",
     serverKind: r.server_kind || "",
+    serverId: r.server_id || "",
     posterAR: r.poster_ar || "",
     dbid: r.dbid || "",
     apiItemId: r.api_item_id || "",
@@ -409,6 +429,7 @@ function entryToParams(e) {
     e.ratingContent || "",
     e.summary || "",
     e.serverKind || "plex",
+    e.serverId || "",
     e.posterAR || "",
     e.dbid || "",
     e.apiItemId || "",
@@ -474,6 +495,20 @@ function selectByServerKind(kind) {
   return out;
 }
 
+function selectByServerId(serverId) {
+  assertDb();
+  const sid = String(serverId || "").trim();
+  if (!sid) return [];
+  const out = [];
+  const s = _sqlDb.prepare("SELECT * FROM poster_entries WHERE server_id = ?");
+  s.bind([sid]);
+  while (s.step()) {
+    out.push(rowFromDb(s.getAsObject()));
+  }
+  s.free();
+  return out;
+}
+
 function getEntryByCacheFile(cacheFile) {
   assertDb();
   const s = _sqlDb.prepare("SELECT * FROM poster_entries WHERE cache_file = ?");
@@ -484,19 +519,31 @@ function getEntryByCacheFile(cacheFile) {
   return row;
 }
 
-function getEntryByServerAndApiItemId(serverKind, apiItemId) {
+function getEntryByServerAndApiItemId(serverKind, apiItemId, serverId) {
   assertDb();
   const sk = String(serverKind || "").toLowerCase().trim();
   const aid = String(apiItemId || "").trim();
-  if (!sk || !aid) return null;
-  const s = _sqlDb.prepare(
+  const sid = String(serverId || "").trim();
+  if (!aid) return null;
+  if (sid) {
+    const s = _sqlDb.prepare(
+      "SELECT * FROM poster_entries WHERE server_id = ? AND api_item_id = ? LIMIT 1"
+    );
+    s.bind([sid, aid]);
+    let row = null;
+    if (s.step()) row = rowFromDb(s.getAsObject());
+    s.free();
+    return row;
+  }
+  if (!sk) return null;
+  const s2 = _sqlDb.prepare(
     "SELECT * FROM poster_entries WHERE server_kind = ? AND api_item_id = ? LIMIT 1"
   );
-  s.bind([sk, aid]);
-  let row = null;
-  if (s.step()) row = rowFromDb(s.getAsObject());
-  s.free();
-  return row;
+  s2.bind([sk, aid]);
+  let row2 = null;
+  if (s2.step()) row2 = rowFromDb(s2.getAsObject());
+  s2.free();
+  return row2;
 }
 
 /**
@@ -505,9 +552,10 @@ function getEntryByServerAndApiItemId(serverKind, apiItemId) {
  * @param {string} serverKind
  * @param {string} apiItemId
  * @param {string|number|Date} sourceUpdatedAt
+ * @param {string} [serverId]
  */
-function shouldSkipSyncItem(serverKind, apiItemId, sourceUpdatedAt) {
-  const row = getEntryByServerAndApiItemId(serverKind, apiItemId);
+function shouldSkipSyncItem(serverKind, apiItemId, sourceUpdatedAt, serverId) {
+  const row = getEntryByServerAndApiItemId(serverKind, apiItemId, serverId);
   if (!row || !row.cacheFile || !fileOk(row.cacheFile)) return false;
   if (sourceUpdatedAt === undefined || sourceUpdatedAt === null || sourceUpdatedAt === "")
     return true;
@@ -540,15 +588,13 @@ function deleteByCacheFiles(files) {
 
 function replaceAllEntries(entries) {
   assertDb();
-  const ins = _sqlDb.prepare(`
-    INSERT INTO poster_entries (
-      cache_file, logo_cache_file, art_cache_file, banner_cache_file,
-      portrait_actor_cache_file, portrait_actress_cache_file,
-      portrait_director_cache_file, portrait_author_cache_file, portrait_artist_cache_file,
-      title, tag_line, year, media_type, tags_text, genres, top_cast, actor_1, actor_2, studio, runtime_mins, rating, content_rating, plot, rating_score, rating_content, summary, server_kind, poster_ar,
-      dbid, api_item_id, library_kind, library_name, source_url, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  const ins = _sqlDb.prepare(
+    "INSERT INTO poster_entries (" +
+      INSERT_COLS +
+      ") VALUES (" +
+      INSERT_PLACEHOLDERS +
+      ")"
+  );
   try {
     _sqlDb.run("BEGIN");
     _sqlDb.run("DELETE FROM poster_entries");
@@ -694,11 +740,12 @@ function unlinkCacheAndArt(cacheFile) {
 
 /**
  * Remove poster metadata + files when the library item no longer exists on the media server.
- * @param {{ currentServerKind: string, isMediaServerEnabled: boolean, maxChecks?: number, minAgeBeforeChangeCheckMins?: number, probeEntryGone: function }} opts
+ * @param {{ currentServerKind: string, currentServerId?: string, isMediaServerEnabled: boolean, maxChecks?: number, minAgeBeforeChangeCheckMins?: number, probeEntryGone: function }} opts
  */
 async function purgeMissingServerItems(opts) {
   const {
     currentServerKind,
+    currentServerId,
     isMediaServerEnabled,
     maxChecks = 35,
     probeEntryGone,
@@ -711,14 +758,17 @@ async function purgeMissingServerItems(opts) {
   if (
     !probeEntryGone ||
     !isMediaServerEnabled ||
-    !currentServerKind ||
+    (!currentServerKind && !currentServerId) ||
     typeof probeEntryGone !== "function"
   ) {
     return { removed: 0, checked: 0 };
   }
 
   assertDb();
-  const all = selectByServerKind(currentServerKind).filter(
+  const pool = currentServerId
+    ? selectByServerId(currentServerId)
+    : selectByServerKind(currentServerKind);
+  const all = pool.filter(
     (e) =>
       (String(e.apiItemId || "").trim() || String(e.sourceUrl || "").trim()) &&
       nowMs - new Date(e.updatedAt || 0).getTime() >= minAgeMs
@@ -764,9 +814,10 @@ async function purgeMissingServerItems(opts) {
  * Record poster files + metadata from Plex/Jellyfin/Emby/Kodi now-screening and on-demand cards.
  * @param {object[]} nsCards
  * @param {object[]} odCards
- * @param {string} serverKind plex|jellyfin|emby|kodi
+ * @param {string} serverKind plex|jellyfin|emby|kodi|sonarr|…
+ * @param {string} [serverId] stable instance id
  */
-function registerFromMediaServerCards(nsCards, odCards, serverKind) {
+function registerFromMediaServerCards(nsCards, odCards, serverKind, serverId) {
   const cards = []
     .concat(Array.isArray(nsCards) ? nsCards : [])
     .concat(Array.isArray(odCards) ? odCards : []);
@@ -793,16 +844,19 @@ function registerFromMediaServerCards(nsCards, odCards, serverKind) {
   const rowCountBefore = countRows();
   const now = new Date().toISOString();
   const kind = String(serverKind || "plex").toLowerCase();
+  const sid = String(
+    serverId ||
+      (cards[0] && cards[0].posterServerId) ||
+      ""
+  ).trim();
 
-  const ins = _sqlDb.prepare(`
-    INSERT OR REPLACE INTO poster_entries (
-      cache_file, logo_cache_file, art_cache_file, banner_cache_file,
-      portrait_actor_cache_file, portrait_actress_cache_file,
-      portrait_director_cache_file, portrait_author_cache_file, portrait_artist_cache_file,
-      title, tag_line, year, media_type, tags_text, genres, top_cast, actor_1, actor_2, studio, runtime_mins, rating, content_rating, plot, rating_score, rating_content, summary, server_kind, poster_ar,
-      dbid, api_item_id, library_kind, library_name, source_url, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  const ins = _sqlDb.prepare(
+    "INSERT OR REPLACE INTO poster_entries (" +
+      INSERT_COLS +
+      ") VALUES (" +
+      INSERT_PLACEHOLDERS +
+      ")"
+  );
 
   try {
     _sqlDb.run("BEGIN");
@@ -874,6 +928,10 @@ function registerFromMediaServerCards(nsCards, odCards, serverKind) {
         ratingContent: String(card.contentRating || "").trim(),
         summary: String(card.summary || "").slice(0, 2000),
         serverKind: kind,
+        serverId:
+          sid ||
+          String(card.posterServerId || "").trim() ||
+          "",
         posterAR: String(card.posterAR || "").trim(),
         dbid: String(card.DBID || "").trim(),
         apiItemId,
@@ -926,6 +984,7 @@ function registerFromMediaServerCards(nsCards, odCards, serverKind) {
         old.ratingScore !== row.ratingScore ||
         old.ratingContent !== row.ratingContent ||
         old.serverKind !== row.serverKind ||
+        old.serverId !== row.serverId ||
         old.summary !== row.summary ||
         old.posterAR !== row.posterAR ||
         old.dbid !== row.dbid ||
@@ -969,14 +1028,25 @@ function registerFromMediaServerCards(nsCards, odCards, serverKind) {
   };
 }
 
-function pickRandomEntries(count, serverKindOpt, hideContentRatings) {
+function pickRandomEntries(count, serverKindOpt, hideContentRatings, serverIdsOpt) {
   let valid = selectAllEntries().filter((e) => e.cacheFile && fileOk(e.cacheFile));
   if (valid.length === 0) return [];
+  const wantIds = Array.isArray(serverIdsOpt)
+    ? serverIdsOpt.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
+  if (wantIds.length > 0) {
+    const idSet = new Set(wantIds);
+    const filtered = valid.filter(
+      (e) => e.serverId && idSet.has(String(e.serverId))
+    );
+    // Prefer filtered; if empty (legacy rows without server_id), fall through to kind/all
+    if (filtered.length > 0) valid = filtered;
+  }
   const wantKind =
     serverKindOpt != null && String(serverKindOpt).trim()
       ? String(serverKindOpt).toLowerCase().trim()
       : "";
-  if (wantKind) {
+  if (wantKind && wantIds.length === 0) {
     const filtered = valid.filter(
       (e) => String(e.serverKind || "").toLowerCase() === wantKind
     );
@@ -1038,15 +1108,18 @@ function ratingColourForContentRating(contentRating) {
  * For live on-demand cards: point poster (and fanart when present) at disk cache if the poster DB has a match.
  * @param {object[]} cards
  * @param {string} serverKind plex|jellyfin|emby|kodi
+ * @param {string} [serverId]
  */
-function applyCachedPostersToMediaCards(cards, serverKind) {
+function applyCachedPostersToMediaCards(cards, serverKind, serverId) {
   if (!Array.isArray(cards) || cards.length === 0) return cards;
   const kind = String(serverKind || "plex").toLowerCase();
+  const sid = String(serverId || "").trim();
   assertDb();
   const byApiId = new Map();
   const byDbId = new Map();
   const bySource = new Map();
-  for (const e of selectByServerKind(kind)) {
+  const pool = sid ? selectByServerId(sid) : selectByServerKind(kind);
+  for (const e of pool) {
     if (!e.cacheFile || !fileOk(e.cacheFile)) continue;
     const api = String(e.apiItemId || "").trim();
     const dbid = String(e.dbid || "").trim();
@@ -1111,18 +1184,19 @@ function applyCachedPostersToMediaCards(cards, serverKind) {
 /**
  * Build on-demand style cards from the poster metadata DB when nothing else is available.
  * @param {number} count
- * @param {string} [serverKind] When set, prefer random picks from this server (plex|jellyfin|emby|kodi).
+ * @param {string} [serverKind] When set (and no serverIds), prefer random picks from this kind.
  * @param {string[]} [hideContentRatings] Hide Ratings list (normalized or raw).
+ * @param {string[]} [serverIds] When set, only include rows for these server_id values.
  * @returns {MediaCard[]}
  */
-function buildFallbackMediaCards(count, serverKind, hideContentRatings) {
+function buildFallbackMediaCards(count, serverKind, hideContentRatings, serverIds) {
   const n =
     typeof count === "number" &&
     count > 0 &&
     Number.isFinite(count)
       ? Math.floor(count)
       : DEFAULT_FALLBACK_COUNT;
-  const rows = pickRandomEntries(n, serverKind, hideContentRatings);
+  const rows = pickRandomEntries(n, serverKind, hideContentRatings, serverIds);
   const cards = [];
   for (const row of rows) {
     const c = new MediaCard();
@@ -1138,6 +1212,7 @@ function buildFallbackMediaCards(count, serverKind, hideContentRatings) {
     if (row.posterAR) c.posterAR = row.posterAR;
     c.DBID = row.dbid || "";
     c.posterApiItemId = String(row.apiItemId || "").trim();
+    c.posterServerId = String(row.serverId || "").trim();
     c.posterLibraryLabel = row.libraryName || "";
     if (row.logoCacheFile) {
       c.posterLogoURL = "/imagecache/" + row.logoCacheFile;
@@ -1218,6 +1293,75 @@ async function clearPosterCacheAndMetadata() {
     now.toLocaleString() +
       " Poster image cache and metadata database cleared (user action)"
   );
+}
+
+/**
+ * Delete all poster metadata rows and matching imagecache files for one server_id.
+ * @param {string} serverId
+ * @returns {{ removedRows: number }}
+ */
+function clearCacheForServerId(serverId) {
+  const sid = String(serverId || "").trim();
+  if (!sid) return { removedRows: 0 };
+  assertDb();
+  const rows = selectByServerId(sid);
+  const files = new Set();
+  for (const r of rows) {
+    if (r.cacheFile) files.add(r.cacheFile);
+    if (r.logoCacheFile) files.add(r.logoCacheFile);
+    if (r.artCacheFile) files.add(r.artCacheFile);
+    if (r.bannerCacheFile) files.add(r.bannerCacheFile);
+    if (r.portraitActorCacheFile) files.add(r.portraitActorCacheFile);
+    if (r.portraitActressCacheFile) files.add(r.portraitActressCacheFile);
+    if (r.portraitDirectorCacheFile) files.add(r.portraitDirectorCacheFile);
+    if (r.portraitAuthorCacheFile) files.add(r.portraitAuthorCacheFile);
+    if (r.portraitArtistCacheFile) files.add(r.portraitArtistCacheFile);
+  }
+  // Also unlink files whose basename is prefixed with server id
+  try {
+    if (fs.existsSync(IMAGECACHE)) {
+      const prefix = sid + "-";
+      for (const name of fs.readdirSync(IMAGECACHE)) {
+        if (name.startsWith(prefix) || name.startsWith(sid)) {
+          files.add(name);
+        }
+      }
+      // *arr synthetic ids use arr-* file names
+      if (sid.startsWith("arr-")) {
+        const arrPrefix = sid.replace(/^arr-/, "arr-") + "-";
+        // arr-sonarr → files arr-sonarr-*.jpg
+        const filePrefix = sid + "-";
+        for (const name of fs.readdirSync(IMAGECACHE)) {
+          if (name.startsWith(filePrefix) || name.startsWith(sid + "-")) {
+            files.add(name);
+          }
+        }
+        void arrPrefix;
+      }
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  for (const cf of files) {
+    unlinkCacheAndArt(cf);
+  }
+  if (rows.length) {
+    deleteByCacheFiles(rows.map((r) => r.cacheFile).filter(Boolean));
+  }
+  // Delete any remaining rows by server_id
+  const del = _sqlDb.prepare("DELETE FROM poster_entries WHERE server_id = ?");
+  del.run([sid]);
+  del.free();
+  persistDb();
+  console.log(
+    new Date().toLocaleString() +
+      " Cleared poster cache for server_id=" +
+      sid +
+      " (" +
+      rows.length +
+      " rows)"
+  );
+  return { removedRows: rows.length };
 }
 
 /**
@@ -1582,6 +1726,7 @@ module.exports = {
   applyCachedPostersToMediaCards,
   buildFallbackMediaCards,
   clearPosterCacheAndMetadata,
+  clearCacheForServerId,
   runScheduledRefresh,
   purgeMissingServerItems,
   getCacheDashboardStats,
@@ -1593,4 +1738,5 @@ module.exports = {
   fileOk,
   IMAGE_KIND_ORDER,
   countRows,
+  selectByServerId,
 };

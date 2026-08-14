@@ -33,6 +33,7 @@ const {
   getMediaServerKind,
   requiresMediaServerCredential,
 } = require("./classes/mediaservers/mediaServerFactory");
+const mediaServersUtil = require("./classes/core/mediaServers");
 const posterMetadata = require("./classes/core/posterMetadataDb");
 const posterSyncRetry = require("./classes/core/posterSyncRetry");
 const nowShowingDb = require("./classes/core/nowShowingDb");
@@ -74,7 +75,7 @@ if(args.length == 2){
 }
 
 console.log("-------------------------------------------------------");
-console.log(" POSTERX - Your media display");
+console.log(" SCREENSTAGE - Your media display");
 console.log(" Developed by Matt Petersen - Brisbane Australia");
 console.log(" ");
 console.log(" Version: " + pjson.version);
@@ -423,7 +424,7 @@ if (!fs.existsSync(dir)) {
   fs.mkdirSync(dir);
 }
 
-// Prevent multiple PosterX processes from running at the same time.
+// Prevent multiple ScreenStage processes from running at the same time.
 const APP_LOCK_FILE = path.join(CONFIG_ROOT, "posterr-app.lock");
 let appLockHeld = false;
 
@@ -471,13 +472,13 @@ function acquireAppLockOrExit() {
           appLockHeld = true;
           console.log(
             new Date().toLocaleString() +
-              " PosterX: removed stale process lock and continued startup"
+              " ScreenStage: removed stale process lock and continued startup"
           );
           return;
         }
         console.log(
           new Date().toLocaleString() +
-            " ✘✘ WARNING ✘✘ - Another PosterX instance is already running (pid " +
+            " ✘✘ WARNING ✘✘ - Another ScreenStage instance is already running (pid " +
             lockPid +
             "). Exiting this process."
         );
@@ -687,6 +688,9 @@ async function loadReadarrComingSoon() {
   // call radarr coming soon
   try {
     csbCards = await readarr.GetComingSoon(now, ltr, loadedSettings.hasArt);
+    if (Array.isArray(csbCards) && csbCards.length) {
+      registerArrCardsIntoPosterCache(csbCards);
+    }
     if (isReadarrUnavailable) {
       console.log(
         "✅ " + bookAppLabel + " connection restored - default poll timers restored"
@@ -742,6 +746,9 @@ async function loadRadarrComingSoon() {
   // call radarr coming soon
   try {
     csrCards = await radarr.GetComingSoon(now, ltr, loadedSettings.genericThemes, loadedSettings.hasArt);
+    if (Array.isArray(csrCards) && csrCards.length) {
+      registerArrCardsIntoPosterCache(csrCards);
+    }
     if (isRadarrUnavailable) {
       console.log(
         "✅ Radarr connection restored - defualt poll timers restored"
@@ -789,6 +796,9 @@ async function loadLidarrComingSoon() {
 
   try {
     cslCards = await lidarr.GetComingSoon(now, ltr, loadedSettings.hasArt);
+    if (Array.isArray(cslCards) && cslCards.length) {
+      registerArrCardsIntoPosterCache(cslCards);
+    }
     if (isLidarrUnavailable) {
       console.log(
         "✅ Lidarr connection restored - default poll timers restored"
@@ -843,6 +853,9 @@ async function loadSonarrComingSoon() {
       loadedSettings.playThemes,
       loadedSettings.hasArt
     );
+    if (Array.isArray(csCards) && csCards.length) {
+      registerArrCardsIntoPosterCache(csCards);
+    }
 
     if (isSonarrUnavailable) {
       console.log(
@@ -1483,23 +1496,32 @@ function filterCardsByHiddenContentRatings(cards) {
   );
 }
 
-/** Library-style slides: cached poster DB first when enabled; live on-demand only as backup. */
+/** Library slides always come from poster cache (cache-first). Live sources only fill the cache. */
 function buildLibrarySlideDeckFromPosterCache() {
-  // Master ON-DEMAND toggle must gate both live fetches and cache-backed library slides.
   if (!isOnDemandEnabled) return [];
-  // Recently-added day filter requires a live media-server query; the poster cache has no added dates.
-  if (recentlyAddedDaysActive() || !preferCachedPostersEnabled()) {
-    return filterCardsByHiddenContentRatings(odCards);
+  const displayIds = mediaServersUtil.listDisplayServerIds(loadedSettings);
+  // Recently-added day filter still needs live mix when active; otherwise cache-only.
+  if (recentlyAddedDaysActive()) {
+    const live = filterCardsByHiddenContentRatings(odCards);
+    if (live.length > 0) return live;
   }
-  const kind = loadedSettings
-    ? getMediaServerKind(loadedSettings.mediaServerType)
-    : "";
   const cached = posterMetadata.buildFallbackMediaCards(
     primaryCachedPosterSlideCount(),
-    kind,
-    hideContentRatingsFromSettings()
+    null,
+    hideContentRatingsFromSettings(),
+    displayIds.length ? displayIds : null
   );
   if (cached.length > 0) return cached;
+  // Empty display filter or empty DB: try all cache rows, then any live OD cards as last resort
+  const anyCached = posterMetadata.buildFallbackMediaCards(
+    primaryCachedPosterSlideCount(),
+    null,
+    hideContentRatingsFromSettings(),
+    null
+  );
+  if (anyCached.length > 0 && (!displayIds.length || !cachedPosterDbHasRows())) {
+    return anyCached;
+  }
   return filterCardsByHiddenContentRatings(odCards);
 }
 
@@ -1508,15 +1530,15 @@ function buildLibrarySlideDeckFromPosterCache() {
  * Now Playing / on-demand network work finishes (first paint on /posters).
  */
 async function warmCachedPosterDeckEarlyIfPossible() {
-  if (!loadedSettings || !isOnDemandEnabled || !preferCachedPostersEnabled()) return;
-  if (recentlyAddedDaysActive()) return;
+  if (!loadedSettings || !isOnDemandEnabled) return;
   if (!cachedPosterDbHasRows()) return;
-  const kind = getMediaServerKind(loadedSettings.mediaServerType);
+  const displayIds = mediaServersUtil.listDisplayServerIds(loadedSettings);
   const warmCount = Math.min(12, primaryCachedPosterSlideCount());
   const cached = posterMetadata.buildFallbackMediaCards(
     warmCount,
-    kind,
-    hideContentRatingsFromSettings()
+    null,
+    hideContentRatingsFromSettings(),
+    displayIds.length ? displayIds : null
   );
   if (!cached.length) return;
   globalPage.cards = cached.slice();
@@ -1609,20 +1631,10 @@ async function loadNowScreening() {
   }
 
   // stop timers dont run if disabled
-  if (!isMediaServerEnabled && !skipMediaServerNowPlayingFetch) {
+  const nsServers = mediaServersUtil.listNowPlayingMediaServers(loadedSettings);
+  if (!nsServers.length && !skipMediaServerNowPlayingFetch) {
     nsCards = [];
-    return nsCards;
-  }
-
-  let ms = null;
-  if (!skipMediaServerNowPlayingFetch) {
-    const Pms = getMediaServerClass(loadedSettings.mediaServerType);
-    ms = new Pms({
-      plexHTTPS: loadedSettings.plexHTTPS,
-      plexIP: loadedSettings.plexIP,
-      plexPort: loadedSettings.plexPort,
-      plexToken: loadedSettings.plexToken,
-    });
+    // Still assemble cache library slides below when OD enabled
   }
 
   let excludeLibraries;
@@ -1637,20 +1649,71 @@ async function loadNowScreening() {
   
 
   let pollInterval = nsCheckSeconds;
-  // call now screening method
-  if (!skipMediaServerNowPlayingFetch) {
+  // call now screening method — merge sessions from all Enable Now Playing servers
+  if (!skipMediaServerNowPlayingFetch && nsServers.length) {
     try {
-      nsCards = await ms.GetNowScreening(
-        loadedSettings.playThemes,
-        loadedSettings.genericThemes,
-        loadedSettings.hasArt,
-        loadedSettings.filterRemote,
-        loadedSettings.filterLocal,
-        loadedSettings.filterDevices,
-        loadedSettings.filterUsers,
-        loadedSettings.hideUser,
-        excludeLibraries
-      );
+      const mergedNs = [];
+      let anyOk = false;
+      for (const server of nsServers) {
+        try {
+          const ms = mediaServersUtil.createMediaServerClient(server);
+          const part = await ms.GetNowScreening(
+            loadedSettings.playThemes,
+            loadedSettings.genericThemes,
+            loadedSettings.hasArt,
+            loadedSettings.filterRemote,
+            loadedSettings.filterLocal,
+            loadedSettings.filterDevices,
+            loadedSettings.filterUsers,
+            loadedSettings.hideUser,
+            excludeLibraries
+          );
+          if (Array.isArray(part) && part.length) {
+            for (const c of part) {
+              if (c && typeof c === "object") {
+                c.posterServerId = server.id;
+              }
+            }
+            mergedNs.push(...part);
+            posterMetadata.applyCachedPostersToMediaCards(
+              part,
+              server.type,
+              server.id
+            );
+          }
+          anyOk = true;
+        } catch (serverErr) {
+          let now = new Date();
+          console.log(
+            now.toLocaleString() +
+              " *Now Playing — " +
+              (server.name || server.host) +
+              ": " +
+              (serverErr && serverErr.message ? serverErr.message : serverErr)
+          );
+        }
+      }
+      nsCards = mergedNs;
+      if (anyOk) {
+        if (isMediaServerUnavailable) {
+          console.log(
+            new Date().toLocaleString() +
+              " ✔ Media server(s) recovered — Now Playing restored"
+          );
+        }
+        isMediaServerUnavailable = false;
+      } else if (nsServers.length) {
+        isMediaServerUnavailable = true;
+      }
+    } catch (err) {
+      /* handled per-server */
+      isMediaServerUnavailable = true;
+    }
+  }
+
+  // legacy single-block Awtrix / error handling continues using nsCards
+  if (!skipMediaServerNowPlayingFetch && nsCards && nsCards.length) {
+    try {
     // Send to Awtrix, if enabled
     if(isAwtrixEnabled){
       var awt = new awtrix();
@@ -1985,30 +2048,47 @@ async function loadNowScreening() {
   }
 
   if (isMediaServerEnabled) {
-    posterMetadata.registerFromMediaServerCards(
-      nsCards,
-      odCards,
-      getMediaServerKind(loadedSettings.mediaServerType)
-    );
-    posterMetadata
-      .purgeMissingServerItems({
-        currentServerKind: getMediaServerKind(loadedSettings.mediaServerType),
-        isMediaServerEnabled,
-        maxChecks: 8,
-        minAgeBeforeChangeCheckMins: Math.max(
-          0,
-          parseInt(loadedSettings.posterCacheMinAgeBeforeChangeCheckMins, 10) ||
-            0
-        ),
-        probeEntryGone: probePosterMetadataEntryGone,
-      })
-      .catch(() => {});
+    const byServer = new Map();
+    for (const c of [].concat(nsCards || []).concat(odCards || [])) {
+      const sid = c && c.posterServerId ? String(c.posterServerId) : "";
+      if (!sid) continue;
+      if (!byServer.has(sid)) byServer.set(sid, []);
+      byServer.get(sid).push(c);
+    }
+    const servers = mediaServersUtil.listConfiguredMediaServers(loadedSettings);
+    for (const server of servers) {
+      const cards = byServer.get(server.id) || [];
+      if (!cards.length) continue;
+      posterMetadata.registerFromMediaServerCards(
+        cards.filter((c) => nsCards && nsCards.includes(c)),
+        cards.filter((c) => odCards && odCards.includes(c)),
+        server.type,
+        server.id
+      );
+      posterMetadata
+        .purgeMissingServerItems({
+          currentServerKind: server.type,
+          currentServerId: server.id,
+          isMediaServerEnabled: true,
+          maxChecks: 8,
+          minAgeBeforeChangeCheckMins: Math.max(
+            0,
+            parseInt(loadedSettings.posterCacheMinAgeBeforeChangeCheckMins, 10) ||
+              0
+          ),
+          probeEntryGone: (entry) =>
+            probePosterMetadataEntryGone(entry, server),
+        })
+        .catch(() => {});
+    }
   }
   if (globalPage.cards.length === 0) {
+    const displayIds = mediaServersUtil.listDisplayServerIds(loadedSettings);
     const cached = posterMetadata.buildFallbackMediaCards(
       posterMetadata.DEFAULT_FALLBACK_COUNT,
-      getMediaServerKind(loadedSettings.mediaServerType),
-      hideContentRatingsFromSettings()
+      null,
+      hideContentRatingsFromSettings(),
+      displayIds.length ? displayIds : null
     );
     if (cached.length > 0) {
       globalPage.cards = cached;
@@ -2090,14 +2170,12 @@ async function loadNowScreening() {
 }
 
 /**
- * On-demand slide pool: when "Prefer cached poster library" is on (default), reads from the poster metadata DB
- * only (filled by sync) — no live GetOnDemand. Otherwise pulls from the media server and optionally rewrites URLs
- * from the poster DB when that same setting is on (legacy path is server-only when prefer-cache is off).
- * @param {number} [numberOnDemandOverride] — if set, used instead of settings.numberOnDemand so fill can work when OD count is 0.
+ * On-demand / library slide pool: cache-first. Live GetOnDemand only when
+ * recently-added days need a live filter; otherwise sync fills the cache.
+ * @param {number} [numberOnDemandOverride]
  */
 async function fetchOnDemandCardsFromServer(numberOnDemandOverride) {
   if (posterSyncProgressState.status === "running") {
-    // Avoid concurrent Jellyfin library scans while a full poster sync is in progress.
     return Array.isArray(odCards) ? odCards : [];
   }
   const count =
@@ -2105,46 +2183,64 @@ async function fetchOnDemandCardsFromServer(numberOnDemandOverride) {
       ? numberOnDemandOverride
       : loadedSettings.numberOnDemand;
 
-  // Prefer-cache skips live GetOnDemand — but recently-added days need a live filter.
-  if (preferCachedPostersEnabled() && !recentlyAddedDaysActive()) {
-    const kind = loadedSettings
-      ? getMediaServerKind(loadedSettings.mediaServerType)
-      : "";
-    const nRaw =
-      typeof count === "number" ? count : parseInt(String(count), 10);
-    const n = !isNaN(nRaw) && nRaw > 0 ? nRaw : primaryCachedPosterSlideCount();
+  const displayIds = mediaServersUtil.listDisplayServerIds(loadedSettings);
+  const nRaw =
+    typeof count === "number" ? count : parseInt(String(count), 10);
+  const n = !isNaN(nRaw) && nRaw > 0 ? nRaw : primaryCachedPosterSlideCount();
+
+  // Cache-first display path (always prefer cache when available)
+  if (!recentlyAddedDaysActive()) {
     return apply3dLibraryFlagToCards(
       posterMetadata.buildFallbackMediaCards(
         n,
-        kind,
-        hideContentRatingsFromSettings()
+        null,
+        hideContentRatingsFromSettings(),
+        displayIds.length ? displayIds : null
       )
     );
   }
 
   let cards = [];
-  if (isMediaServerEnabled) {
-    const PmsOd = getMediaServerClass(loadedSettings.mediaServerType);
-    const ms = new PmsOd({
-      plexHTTPS: loadedSettings.plexHTTPS,
-      plexIP: loadedSettings.plexIP,
-      plexPort: loadedSettings.plexPort,
-      plexToken: loadedSettings.plexToken,
-    });
-    cards = await ms.GetOnDemand(
-      loadedSettings.onDemandLibraries,
-      count,
-      loadedSettings.playThemes,
-      loadedSettings.genericThemes,
-      loadedSettings.hasArt,
-      loadedSettings.genres,
-      loadedSettings.recentlyAddedDays,
-      loadedSettings.contentRatings,
-      {
-        imagePull: buildImagePullOptions(),
-        tmdbApiKey: loadedSettings.tmdbApiKey || "",
+  const syncServers = mediaServersUtil.listSyncMediaServers(loadedSettings);
+  for (const server of syncServers) {
+    if (!String(server.libraries || "").trim()) continue;
+    try {
+      const ms = mediaServersUtil.createMediaServerClient(server);
+      const part = await ms.GetOnDemand(
+        server.libraries,
+        count,
+        loadedSettings.playThemes,
+        loadedSettings.genericThemes,
+        loadedSettings.hasArt,
+        loadedSettings.genres,
+        loadedSettings.recentlyAddedDays,
+        loadedSettings.contentRatings,
+        {
+          imagePull: buildImagePullOptions(),
+          tmdbApiKey: loadedSettings.tmdbApiKey || "",
+        }
+      );
+      if (Array.isArray(part)) {
+        for (const c of part) {
+          if (c) c.posterServerId = server.id;
+        }
+        cards = cards.concat(part);
+        posterMetadata.registerFromMediaServerCards(
+          [],
+          part,
+          server.type,
+          server.id
+        );
       }
-    );
+    } catch (e) {
+      console.log(
+        new Date().toLocaleString() +
+          " *On-demand — " +
+          (server.name || server.host) +
+          ": " +
+          (e && e.message ? e.message : e)
+      );
+    }
   }
 
   // Recently-added: also pull from *arr (import/added dates outrank cache; merge with server).
@@ -2153,15 +2249,95 @@ async function fetchOnDemandCardsFromServer(numberOnDemandOverride) {
     const arrRa = await fetchArrRecentlyAddedCards(days);
     if (arrRa.length) {
       cards = mergeRecentlyAddedServerAndArr(cards, arrRa);
-      const nRaw =
-        typeof count === "number" ? count : parseInt(String(count), 10);
+      registerArrCardsIntoPosterCache(arrRa);
       if (!isNaN(nRaw) && nRaw > 0 && cards.length > nRaw) {
         cards = await util.build_random_od_set(nRaw, cards, 0);
       }
     }
   }
 
+  if (!cards.length) {
+    cards = posterMetadata.buildFallbackMediaCards(
+      n,
+      null,
+      hideContentRatingsFromSettings(),
+      displayIds.length ? displayIds : null
+    );
+  }
+
   return apply3dLibraryFlagToCards(cards);
+}
+
+function registerArrCardsIntoPosterCache(cards) {
+  if (!Array.isArray(cards) || !cards.length) return;
+  const byKind = new Map();
+  for (const c of cards) {
+    const kind = String((c && c.posterLibraryKind) || c._arrKind || "")
+      .toLowerCase()
+      .trim();
+    let sid = "";
+    let sk = "";
+    const url = String((c && c.posterURL) || "");
+    if (url.includes("arr-sonarr") || kind === "sonarr") {
+      sk = "sonarr";
+      sid = mediaServersUtil.ARR_SERVER_IDS.sonarr;
+    } else if (url.includes("arr-radarr") || kind === "radarr") {
+      sk = "radarr";
+      sid = mediaServersUtil.ARR_SERVER_IDS.radarr;
+    } else if (url.includes("arr-lidarr") || kind === "lidarr") {
+      sk = "lidarr";
+      sid = mediaServersUtil.ARR_SERVER_IDS.lidarr;
+    } else if (
+      url.includes("arr-readarr") ||
+      url.includes("arr-chaptarr") ||
+      kind === "readarr" ||
+      kind === "chaptarr"
+    ) {
+      sk =
+        loadedSettings && loadedSettings.bookArrKind === "chaptarr"
+          ? "chaptarr"
+          : "readarr";
+      sid =
+        mediaServersUtil.ARR_SERVER_IDS[sk] ||
+        mediaServersUtil.ARR_SERVER_IDS.readarr;
+    } else {
+      continue;
+    }
+    if (!byKind.has(sid)) byKind.set(sid, { kind: sk, cards: [] });
+    c.posterServerId = sid;
+    byKind.get(sid).cards.push(c);
+  }
+  for (const [sid, pack] of byKind) {
+    posterMetadata.registerFromMediaServerCards([], pack.cards, pack.kind, sid);
+  }
+}
+
+async function syncArrAppsIntoPosterCache() {
+  try {
+    if (isSonarrEnabled || isRadarrEnabled || isLidarrEnabled || isReadarrEnabled) {
+      const days = Math.max(
+        parseInt(loadedSettings.sonarrCalDays, 10) || 0,
+        parseInt(loadedSettings.radarrCalDays, 10) || 0,
+        30
+      );
+      const ra = await fetchArrRecentlyAddedCards(days);
+      if (ra.length) registerArrCardsIntoPosterCache(ra);
+      if (Array.isArray(csCards) && csCards.length)
+        registerArrCardsIntoPosterCache(csCards);
+      if (Array.isArray(csrCards) && csrCards.length)
+        registerArrCardsIntoPosterCache(csrCards);
+      if (Array.isArray(cslCards) && cslCards.length)
+        registerArrCardsIntoPosterCache(cslCards);
+      if (Array.isArray(csbCards) && csbCards.length)
+        registerArrCardsIntoPosterCache(csbCards);
+    }
+  } catch (e) {
+    console.log(
+      new Date().toLocaleString() +
+        " *arr cache sync: " +
+        (e && e.message ? e.message : e)
+    );
+  }
 }
 
 /**
@@ -2236,7 +2412,7 @@ async function ensureOdCardsForNowShowingFill() {
     loadedSettings.nowShowingFillFromServer === "true" &&
     (Number(loadedSettings.nowShowingFillLibraryMax) || 0) > 0;
   if (!fillOn) return [];
-  if (!isMediaServerEnabled && !preferCachedPostersEnabled()) return [];
+  if (!isMediaServerEnabled && !cachedPosterDbHasRows()) return [];
   if (posterSyncProgressState.status === "running") {
     return Array.isArray(odCards) ? odCards : [];
   }
@@ -2440,21 +2616,10 @@ async function checkEnabled() {
     isSleepEnabled = false;
   }
 
-  // check media server connection fields (Kodi may use empty token if HTTP auth disabled)
-  const _tokenOk =
-    !requiresMediaServerCredential(loadedSettings.mediaServerType) ||
-    (loadedSettings.plexToken !== undefined && loadedSettings.plexToken !== "");
-  if (
-    loadedSettings.plexIP !== undefined &&
-    loadedSettings.plexIP !== "" &&
-    _tokenOk &&
-    loadedSettings.plexPort !== undefined &&
-    loadedSettings.plexPort !== ""
-  ) {
-    isMediaServerEnabled = true;
-  } else {
-    isMediaServerEnabled = false;
-  }
+  // Multi media-server: any configured+enabled entry counts
+  const configuredServers =
+    mediaServersUtil.listConfiguredMediaServers(loadedSettings);
+  isMediaServerEnabled = configuredServers.length > 0;
 
   // check Sonarr / Radarr before on-demand (recently-added can use *arr alone)
   if (
@@ -2479,13 +2644,12 @@ async function checkEnabled() {
     isRadarrEnabled = false;
   }
 
-  // On-demand: live library fetches need a configured media server; cache-backed slides can run
-  // offline when "Prefer cached poster library" is on and the poster DB has rows (filled by sync).
-  // Recently-added days can also run from Radarr/Sonarr imports alone.
+  // On-demand / library deck: cache-first. Enable when OD not disabled and
+  // (cache has rows OR sync sources exist OR recently-added *arr).
   const odNotDisabled = loadedSettings.enableOD !== "false";
-  const libsConfigured =
-    loadedSettings.onDemandLibraries !== undefined &&
-    String(loadedSettings.onDemandLibraries || "").trim().length > 0;
+  const libsConfigured = mediaServersUtil
+    .listSyncMediaServers(loadedSettings)
+    .some((s) => String(s.libraries || "").trim().length > 0);
   const numConfigured = loadedSettings.numberOnDemand !== undefined;
   const arrRecentlyAddedOk =
     recentlyAddedDaysActive() && (isSonarrEnabled || isRadarrEnabled);
@@ -2493,12 +2657,13 @@ async function checkEnabled() {
     isOnDemandEnabled = false;
   } else if (arrRecentlyAddedOk) {
     isOnDemandEnabled = true;
-  } else if (preferCachedPostersEnabled()) {
+  } else {
     isOnDemandEnabled =
       cachedPosterDbHasRows() ||
-      (isMediaServerEnabled && libsConfigured);
-  } else {
-    isOnDemandEnabled = isMediaServerEnabled && libsConfigured;
+      (isMediaServerEnabled && libsConfigured) ||
+      isSonarrEnabled ||
+      isRadarrEnabled ||
+      false;
   }
 
   // check Lidarr
@@ -2646,24 +2811,28 @@ async function theaterOff(theater) {
     console.log(d.toLocaleString() + ` ** Theatre mode deactivated`);
 }
 
-async function probePosterMetadataEntryGone(entry) {
-  if (!isMediaServerEnabled || !loadedSettings) return false;
+async function probePosterMetadataEntryGone(entry, serverEntry) {
+  if (!loadedSettings) return false;
   try {
-    const Pms = getMediaServerClass(loadedSettings.mediaServerType);
-    const ms = new Pms({
-      plexHTTPS: loadedSettings.plexHTTPS,
-      plexIP: loadedSettings.plexIP,
-      plexPort: loadedSettings.plexPort,
-      plexToken: loadedSettings.plexToken,
-    });
-    if (typeof ms.posterMetadataEntryGone !== "function") return false;
+    const ms = serverEntry
+      ? mediaServersUtil.createMediaServerClient(serverEntry)
+      : newMediaServerClient();
+    if (!ms || typeof ms.posterMetadataEntryGone !== "function") return false;
     return await ms.posterMetadataEntryGone(entry);
   } catch (e) {
     return false;
   }
 }
 
-function newMediaServerClient() {
+function newMediaServerClient(serverEntry) {
+  if (serverEntry) {
+    return mediaServersUtil.createMediaServerClient(serverEntry);
+  }
+  const list = mediaServersUtil.listConfiguredMediaServers(loadedSettings);
+  if (list.length > 0) {
+    return mediaServersUtil.createMediaServerClient(list[0]);
+  }
+  // Legacy fallback
   const Pms = getMediaServerClass(loadedSettings.mediaServerType);
   return new Pms({
     plexHTTPS: loadedSettings.plexHTTPS,
@@ -2749,26 +2918,55 @@ async function syncFullPosterLibraryFromMediaServer(options) {
     if (!syncDebugEnabled) return;
     console.log(new Date().toLocaleString() + " [poster sync debug] " + msg);
   };
-  if (posterSyncProgressState.status === "running") {
+
+  // Multi-server: when no specific serverEntry, queue each sync-enabled server then *arr
+  if (!(options && options.serverEntry) && !(options && options._arrOnlyPass)) {
+    if (posterSyncProgressState.status === "running") {
+      return;
+    }
+    const servers = mediaServersUtil
+      .listSyncMediaServers(loadedSettings)
+      .filter((s) => String(s.libraries || "").trim().length > 0);
+    if (!servers.length) {
+      await syncArrAppsIntoPosterCache();
+      return;
+    }
+    for (const server of servers) {
+      if (posterSyncAbortRequested) break;
+      await syncFullPosterLibraryFromMediaServer(
+        Object.assign({}, options || {}, { serverEntry: server })
+      );
+    }
+    await syncArrAppsIntoPosterCache();
     return;
   }
-  if (!loadedSettings || !isMediaServerEnabled || isMediaServerUnavailable) return;
-  if (
-    !loadedSettings.onDemandLibraries ||
-    !String(loadedSettings.onDemandLibraries).trim()
-  ) {
+
+  if (posterSyncProgressState.status === "running" && !(options && options.serverEntry)) {
     return;
   }
-  const configuredNames = getConfiguredOnDemandLibraryNames(
-    loadedSettings.onDemandLibraries
-  );
+  const serverEntry =
+    options && options.serverEntry
+      ? mediaServersUtil.normalizeMediaServerEntry(options.serverEntry)
+      : null;
+  if (!loadedSettings || !serverEntry) {
+    return;
+  }
+  const libraryCsvForServer = String(
+    (serverEntry && serverEntry.libraries) ||
+      loadedSettings.onDemandLibraries ||
+      ""
+  ).trim();
+  if (!libraryCsvForServer) {
+    return;
+  }
+  const configuredNames = getConfiguredOnDemandLibraryNames(libraryCsvForServer);
   const singleRaw =
     options && options.singleLibrary != null
       ? String(options.singleLibrary).trim()
       : "";
   const metadataOnly =
     options && options.metadataOnlySync === true;
-  let libraryCsv = String(loadedSettings.onDemandLibraries).trim();
+  let libraryCsv = libraryCsvForServer;
   if (singleRaw) {
     const resolved = matchConfiguredLibraryName(singleRaw, configuredNames);
     if (!resolved) {
@@ -2778,7 +2976,7 @@ async function syncFullPosterLibraryFromMediaServer(options) {
   }
   let ms;
   try {
-    ms = newMediaServerClient();
+    ms = newMediaServerClient(serverEntry);
   } catch (e) {
     return;
   }
@@ -2789,7 +2987,7 @@ async function syncFullPosterLibraryFromMediaServer(options) {
   posterSyncProgressState.phase = "starting";
   posterSyncProgressState.label = singleRaw
     ? "Starting (one library)…"
-    : "Starting…";
+    : "Starting " + (serverEntry.name || serverEntry.host) + "…";
   posterSyncProgressState.processed = 0;
   posterSyncProgressState.total = 0;
   posterSyncProgressState.libraries = [];
@@ -2800,9 +2998,9 @@ async function syncFullPosterLibraryFromMediaServer(options) {
   posterSyncProgressState.error = "";
   posterSyncProgressState.startedAt = Date.now();
   posterSyncProgressState.finishedAt = null;
-  posterSyncProgressState.serverKind = getMediaServerKind(
-    loadedSettings.mediaServerType
-  );
+  posterSyncProgressState.serverKind = serverEntry.type;
+  posterSyncProgressState.serverId = serverEntry.id;
+  posterSyncProgressState.serverName = serverEntry.name || serverEntry.host;
 
   const syncStarted = Date.now();
   const runIdTag = " [run " + posterSyncProgressState.runId + "]";
@@ -2811,6 +3009,8 @@ async function syncFullPosterLibraryFromMediaServer(options) {
       metadataOnly +
       ", serverKind=" +
       posterSyncProgressState.serverKind +
+      ", serverId=" +
+      serverEntry.id +
       ', libraryCsv="' +
       libraryCsv +
       '"'
@@ -2821,6 +3021,8 @@ async function syncFullPosterLibraryFromMediaServer(options) {
       runIdTag +
       " " +
       posterSyncProgressState.serverKind +
+      " @" +
+      (serverEntry.name || serverEntry.host) +
       ' — libraries: "' +
       libraryCsv +
       '"' +
@@ -2884,7 +3086,8 @@ async function syncFullPosterLibraryFromMediaServer(options) {
             : buildPosterSyncImagePullOptions(),
           tmdbApiKey: loadedSettings.tmdbApiKey || "",
           retryLibraryKeysFromLastSync: posterSyncRetry.loadRetryKeys(
-            posterSyncProgressState.serverKind
+            posterSyncProgressState.serverKind,
+            posterSyncProgressState.serverId
           ),
           posterSyncServerKind: posterSyncProgressState.serverKind,
           posterSyncAbortCheck: () => posterSyncAbortRequested,
@@ -2894,10 +3097,14 @@ async function syncFullPosterLibraryFromMediaServer(options) {
               .toLowerCase() !== "false",
           onPosterSyncBatch: async (batchCards, batchMeta) => {
             if (!Array.isArray(batchCards) || batchCards.length === 0) return;
+            for (const c of batchCards) {
+              if (c) c.posterServerId = posterSyncProgressState.serverId;
+            }
             const rs = posterMetadata.registerFromMediaServerCards(
               [],
               batchCards,
-              posterSyncProgressState.serverKind
+              posterSyncProgressState.serverKind,
+              posterSyncProgressState.serverId
             );
             streamRegisterCalls += 1;
             streamRegisterWritten += Number((rs && rs.written) || 0);
@@ -2987,7 +3194,8 @@ async function syncFullPosterLibraryFromMediaServer(options) {
       regStats = posterMetadata.registerFromMediaServerCards(
         [],
         cards,
-        posterSyncProgressState.serverKind
+        posterSyncProgressState.serverKind,
+        posterSyncProgressState.serverId
       );
     }
     try {
@@ -3022,7 +3230,8 @@ async function syncFullPosterLibraryFromMediaServer(options) {
         cards,
         posterSyncProgressState.serverKind,
         buildImagePullOptions()
-      )
+      ),
+      posterSyncProgressState.serverId
     );
     posterSyncProgressState.status = "done";
     posterSyncProgressState.phase = "complete";
@@ -3366,7 +3575,7 @@ async function startup(clearCache) {
       console.log("");
     }
     else {
-      console.log("*** You are running the latest version of PosterX ***");
+      console.log("*** You are running the latest version of ScreenStage ***");
       console.log("");
     }
   }
@@ -4664,7 +4873,7 @@ app.get(BASEURL + "/ads/data", (req, res) => {
   }
 });
 
-// Used by the web client to check connection status to PosterX, and also to determine if there was a cold start that was missed
+// Used by the web client to check connection status to ScreenStage, and also to determine if there was a cold start that was missed
 
 app.get(BASEURL + "/conncheck", (req, res) => {
   res.send({ "status": cold_start_time, "sleep": sleep });
@@ -4924,7 +5133,185 @@ app.post(BASEURL + "/settings/clear-poster-cache", async (req, res) => {
       text: "Could not clear poster cache: " + msg,
     };
   }
-  res.redirect(302, BASEURL + "/settings");
+  res.redirect(302, BASEURL + "/settings/media-server");
+});
+
+app.post(BASEURL + "/settings/media-server/clear-arr-cache", (req, res) => {
+  if (loadedSettings.password !== undefined && !userData.valid) {
+    return res.redirect(302, BASEURL + "/logon");
+  }
+  const kind = String(req.body.arrKind || "").toLowerCase();
+  let sid = mediaServersUtil.ARR_SERVER_IDS[kind];
+  if (kind === "readarr" && loadedSettings.bookArrKind === "chaptarr") {
+    sid = mediaServersUtil.ARR_SERVER_IDS.chaptarr;
+  }
+  if (!sid) {
+    req.session.cacheClearNotice = {
+      ok: false,
+      text: "Unknown *arr kind.",
+    };
+    return res.redirect(302, BASEURL + "/settings/media-server");
+  }
+  try {
+    const r = posterMetadata.clearCacheForServerId(sid);
+    req.session.cacheClearNotice = {
+      ok: true,
+      text: "Cleared " + (r.removedRows || 0) + " cached *arr row(s) for " + kind + ".",
+    };
+  } catch (e) {
+    req.session.cacheClearNotice = {
+      ok: false,
+      text: "Could not clear *arr cache: " + (e && e.message ? e.message : e),
+    };
+  }
+  return res.redirect(302, BASEURL + "/settings/media-server");
+});
+
+app.get(BASEURL + "/settings/media-server", (req, res) => {
+  if (loadedSettings.password !== undefined && !userData.valid) {
+    return res.redirect(302, BASEURL + "/logon");
+  }
+  customPicFolders = getDirectories(CUSTOM_PICTURES_ROOT);
+  const cacheClearNotice = req.session.cacheClearNotice || null;
+  req.session.cacheClearNotice = null;
+  const notice = req.session.mediaServerNotice || null;
+  req.session.mediaServerNotice = null;
+  res.render("settings-media-server", {
+    success: req.session.success,
+    user:
+      loadedSettings.password === undefined ? { valid: true } : userData,
+    settings: loadedSettings,
+    version: pjson.version,
+    baseUrl: BASEURL,
+    customPicFolders: customPicFolders,
+    latestVersion: latestVersion,
+    message: message,
+    updateAvailable: updateAvailable,
+    notice: notice,
+    cacheClearNotice: cacheClearNotice,
+    ...newFeaturesBannerViewData(),
+  });
+});
+
+app.post(BASEURL + "/settings/media-server", async (req, res) => {
+  if (loadedSettings.password !== undefined && !userData.valid) {
+    return res.redirect(302, BASEURL + "/logon");
+  }
+  try {
+    const parsed = mediaServersUtil.parseMediaServersFromFormBody(req.body);
+    const validated = mediaServersUtil.validateMediaServersForSave(parsed);
+    if (!validated.ok) {
+      req.session.mediaServerNotice = {
+        ok: false,
+        text: validated.errors.join(" "),
+      };
+      return res.redirect(302, BASEURL + "/settings/media-server");
+    }
+
+    const clearRaw = String(req.body.clearCacheServerIds || "").trim();
+    const clearIds = clearRaw
+      ? clearRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    for (const sid of clearIds) {
+      try {
+        posterMetadata.clearCacheForServerId(sid);
+      } catch (e) {
+        console.log(
+          new Date().toLocaleString() +
+            " clearCacheForServerId failed: " +
+            (e && e.message ? e.message : e)
+        );
+      }
+    }
+
+    loadedSettings.mediaServers = validated.mediaServers;
+    mediaServersUtil.syncLegacyFlatFromMediaServers(loadedSettings);
+
+    const refreshRaw = req.body.posterCacheRefreshMins;
+    const refreshN = parseInt(refreshRaw, 10);
+    loadedSettings.posterCacheRefreshMins =
+      refreshRaw === undefined ||
+      refreshRaw === null ||
+      refreshRaw === "" ||
+      isNaN(refreshN)
+        ? 0
+        : Math.max(0, refreshN);
+
+    const minAgeRaw = req.body.posterCacheMinAgeBeforeChangeCheckMins;
+    const minAgeN = parseInt(minAgeRaw, 10);
+    loadedSettings.posterCacheMinAgeBeforeChangeCheckMins =
+      minAgeRaw === undefined ||
+      minAgeRaw === null ||
+      minAgeRaw === "" ||
+      isNaN(minAgeN)
+        ? 0
+        : Math.max(0, minAgeN);
+
+    loadedSettings.preferCachedPosters = req.body.preferCachedPosters
+      ? "true"
+      : "false";
+
+    const slideRaw = req.body.cachedPosterSlideCount;
+    const slideN = parseInt(slideRaw, 10);
+    loadedSettings.cachedPosterSlideCount =
+      slideRaw === undefined ||
+      slideRaw === null ||
+      slideRaw === "" ||
+      isNaN(slideN) ||
+      slideN < 1 ||
+      !Number.isFinite(slideN)
+        ? DEFAULT_SETTINGS.cachedPosterSlideCount
+        : Math.floor(slideN);
+
+    await setng.UpdateSettings(loadedSettings);
+
+    clearInterval(nowScreeningClock);
+    clearInterval(onDemandClock);
+    clearInterval(sonarrClock);
+    clearInterval(radarrClock);
+    clearInterval(readarrClock);
+    clearInterval(lidarrClock);
+    clearInterval(houseKeepingClock);
+    clearInterval(picturesClock);
+    clearInterval(triviaClock);
+    clearInterval(linksClock);
+    clearInterval(posterMetadataRefreshClock);
+    nsCards = [];
+    odCards = [];
+    csCards = [];
+    csrCards = [];
+    picCards = [];
+    adSlideCards = [];
+    cslCards = [];
+    csbCards = [];
+    trivCards = [];
+    linkCards = [];
+    globalPage.cards = [];
+    console.log(
+      "✘✘ WARNING ✘✘ - Restarting after media server settings save. Please wait while current jobs complete"
+    );
+    startup(false);
+
+    const clearedNote = clearIds.length
+      ? " Cleared cache for " + clearIds.length + " removed server(s)."
+      : "";
+    req.session.mediaServerNotice = {
+      ok: true,
+      text:
+        "Media server settings saved (" +
+        validated.mediaServers.length +
+        " server(s)). Services are restarting." +
+        clearedNote,
+    };
+  } catch (e) {
+    req.session.mediaServerNotice = {
+      ok: false,
+      text:
+        "Could not save media server settings: " +
+        (e && e.message ? e.message : e),
+    };
+  }
+  return res.redirect(302, BASEURL + "/settings/media-server");
 });
 
 app.post(BASEURL + "/settings/new-features-acknowledge", (req, res) => {
@@ -5060,9 +5447,20 @@ app.get(BASEURL + "/settings/sync", (req, res) => {
     message: message,
     updateAvailable: updateAvailable,
     syncNotice: syncNotice,
-    onDemandLibraryList: getConfiguredOnDemandLibraryNames(
-      loadedSettings.onDemandLibraries
-    ),
+    onDemandLibraryList: (function () {
+      const names = [];
+      const seen = new Set();
+      for (const s of mediaServersUtil.listSyncMediaServers(loadedSettings)) {
+        for (const n of getConfiguredOnDemandLibraryNames(s.libraries)) {
+          const k = n.toLowerCase();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          names.push(n);
+        }
+      }
+      return names;
+    })(),
+    mediaServerList: mediaServersUtil.listConfiguredMediaServers(loadedSettings),
     ...newFeaturesBannerViewData(),
   });
 });
@@ -5072,17 +5470,21 @@ app.post(BASEURL + "/settings/sync/trigger", (req, res) => {
     return res.redirect(302, BASEURL + "/logon");
   }
   if (!isMediaServerEnabled) {
+    // Still allow *arr-only / cache sync
+    syncFullPosterLibraryFromMediaServer({}).catch(() => {});
     req.session.syncNotice = {
-      ok: false,
-      text: "Media server is not configured or cannot be reached. Check Settings → Media server.",
+      ok: true,
+      text: "No media servers configured — syncing *arr into poster cache if available.",
     };
     return res.redirect(302, BASEURL + "/settings/sync");
   }
-  const libs = loadedSettings.onDemandLibraries;
-  if (!libs || !String(libs).trim()) {
+  const syncServers = mediaServersUtil
+    .listSyncMediaServers(loadedSettings)
+    .filter((s) => String(s.libraries || "").trim());
+  if (!syncServers.length) {
     req.session.syncNotice = {
       ok: false,
-      text: "Configure on-demand library names in Settings before running a full sync.",
+      text: "Add library names on each media server (Settings → Media Server) before running a full sync.",
     };
     return res.redirect(302, BASEURL + "/settings/sync");
   }
@@ -6074,18 +6476,6 @@ app.post(
         return true;
       })
       .withMessage("'Slide Duration' is required and must be 5 or more"),
-    check("plexIP").not().isEmpty().withMessage("'Media server address' is required"),
-    check("plexPort")
-      .not()
-      .isEmpty()
-      .withMessage("'Media server port' is required. (setting default)")
-      .custom((value) => {
-        if (parseInt(value) === "NaN") {
-          throw new Error("'Media server port' must be a number");
-        }
-        // Indicates the success of this synchronous custom validator
-        return true;
-      }),
     check("onDemandRefresh")
       .not()
       .isEmpty()
@@ -6134,15 +6524,6 @@ app.post(
         // Indicates the success of this synchronous custom validator
         return true;
       }),
-    check("plexToken").custom((value, { req }) => {
-      if (!requiresMediaServerCredential(req.body.mediaServerType || "plex")) {
-        return true;
-      }
-      if (value === undefined || value === null || String(value).trim() === "") {
-        throw new Error("'Media server token / API key' is required");
-      }
-      return true;
-    }),
     check("enableSleep")
       .custom((value, { req }) => {
         if(value == "true"){
@@ -6208,14 +6589,6 @@ app.post(
       shuffleSwitch: req.body.shuffleSwitch,
       hideSettingsLinks: req.body.hideSettingsLinks,
       theaterRoomMode: req.body.theaterRoomMode,
-      mediaServerType: req.body.mediaServerType || "plex",
-      plexToken:
-        req.body.plexToken !== undefined && req.body.plexToken !== null
-          ? req.body.plexToken
-          : "",
-      plexIP: req.body.plexIP,
-      plexHTTPSSwitch: req.body.plexHTTPSSwitch,
-      plexPort: req.body.plexPort ? parseInt(req.body.plexPort) : DEFAULT_SETTINGS.plexPort,
       plexLibraries: req.body.plexLibraries,
       onDemand3dLibraries: req.body.onDemand3dLibraries,
       pinNSSwitch: req.body.pinNSSwitch,
@@ -6368,28 +6741,6 @@ app.post(
       links: req.body.links,
       rotate: req.body.rotate,
       excludeLibs: req.body.excludeLibs,
-      posterCacheRefreshMins: (() => {
-        const raw = req.body.posterCacheRefreshMins;
-        if (raw === undefined || raw === null || raw === "") return 0;
-        const n = parseInt(raw, 10);
-        return isNaN(n) ? 0 : Math.max(0, n);
-      })(),
-      posterCacheMinAgeBeforeChangeCheckMins: (() => {
-        const raw = req.body.posterCacheMinAgeBeforeChangeCheckMins;
-        if (raw === undefined || raw === null || raw === "") return 0;
-        const n = parseInt(raw, 10);
-        return isNaN(n) ? 0 : Math.max(0, n);
-      })(),
-      preferCachedPosters: req.body.preferCachedPosters,
-      cachedPosterSlideCount: (() => {
-        const raw = req.body.cachedPosterSlideCount;
-        if (raw === undefined || raw === null || raw === "")
-          return DEFAULT_SETTINGS.cachedPosterSlideCount;
-        const n = parseInt(raw, 10);
-        return isNaN(n) || n < 1 || !Number.isFinite(n)
-          ? DEFAULT_SETTINGS.cachedPosterSlideCount
-          : Math.floor(n);
-      })(),
       saved: false
     };
 

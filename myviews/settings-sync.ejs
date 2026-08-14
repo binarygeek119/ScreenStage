@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="<%=baseUrl%>/css/settings-styles.css">
   <link rel="stylesheet" href="<%=baseUrl%>/css/light.min.css">
   <link rel="stylesheet" href="<%=baseUrl%>/css/font-awesome.min.css">
-  <title>PosterX — Sync</title>
+  <title>ScreenStage — Sync</title>
   <link rel="shortcut icon" type="image/png" href="<%=baseUrl%>/favicons/favicon.ico" />
 </head>
 <body>
@@ -22,7 +22,7 @@
   <div class="container">
     <nav aria-label="breadcrumb" class="main-breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">PosterX</a></li>
+        <li class="breadcrumb-item"><a href="<%=baseUrl%>/">ScreenStage</a></li>
         <li class="breadcrumb-item"><a href="<%=baseUrl%>/settings">Settings</a></li>
         <li class="breadcrumb-item active" aria-current="page">Sync</li>
       </ol>
@@ -34,6 +34,9 @@
             <nav class="nav flex-column nav-pills nav-gap-y-1">
               <a href="<%=baseUrl%>/settings" class="nav-item nav-link has-icon nav-link-faded">
                 <i class="fal fa-cog"></i><span class="menu">Settings</span>
+              </a>
+              <a href="<%=baseUrl%>/settings/media-server" class="nav-item nav-link has-icon nav-link-faded">
+                <i class="fal fa-server"></i><span class="menu">Media Server</span>
               </a>
               <a href="<%=baseUrl%>/settings/sync" class="nav-item nav-link has-icon nav-link-faded active">
                 <i class="fal fa-sync"></i><span class="menu">Sync</span>
@@ -76,6 +79,9 @@
                 <a href="<%=baseUrl%>/settings" class="nav-link has-icon"><i class="fal fa-cog"></i></a>
               </li>
               <li class="nav-item">
+                <a href="<%=baseUrl%>/settings/media-server" class="nav-link has-icon"><i class="fal fa-server"></i></a>
+              </li>
+              <li class="nav-item">
                 <a href="<%=baseUrl%>/settings/sync" class="nav-link has-icon active"><i class="fal fa-sync"></i></a>
               </li>
               <li class="nav-item">
@@ -114,7 +120,7 @@
                 <i class="fal fa-info-circle mr-2" aria-hidden="true"></i><span>About sync</span>
               </button>
             </div>
-            <p class="text-muted">PosterX can walk your configured on-demand libraries on Plex, Jellyfin, Emby, or Kodi and cache posters, backgrounds, banners, cast portraits, and related images into <code>config/cache/imagecache</code>, with metadata in <code>config/posterr-poster-metadata.db</code> (SQLite). Legacy data under <code>saved/</code> (JSON or SQLite) is migrated automatically on first start. After a sync, open <strong>Cache</strong> in the sidebar for a full <strong>cache status</strong> summary and per-type image counts.</p>
+            <p class="text-muted">ScreenStage can walk your configured on-demand libraries on Plex, Jellyfin, Emby, or Kodi and cache posters, backgrounds, banners, cast portraits, and related images into <code>config/cache/imagecache</code>, with metadata in <code>config/posterr-poster-metadata.db</code> (SQLite). Legacy data under <code>saved/</code> (JSON or SQLite) is migrated automatically on first start. After a sync, open <strong>Cache</strong> in the sidebar for a full <strong>cache status</strong> summary and per-type image counts.</p>
 
             <dl class="row small mb-4">
               <dt class="col-sm-5">Refresh poster DB (minutes)</dt>
@@ -124,14 +130,27 @@
               <dt class="col-sm-5">Prefer cached poster library</dt>
               <dd class="col-sm-7"><%= settings.preferCachedPosters == 'true' ? 'On' : 'Off' %></dd>
               <dt class="col-sm-5">On-demand libraries</dt>
-              <dd class="col-sm-7"><%= settings.onDemandLibraries ? settings.onDemandLibraries : '—' %></dd>
+              <dd class="col-sm-7"><%
+                var _libBits = [];
+                if (typeof mediaServerList !== 'undefined' && mediaServerList && mediaServerList.length) {
+                  mediaServerList.forEach(function (s) {
+                    if (s.libraries) _libBits.push((s.name || s.host || s.type) + ': ' + s.libraries);
+                  });
+                }
+              %><%= _libBits.length ? _libBits.join(' · ') : (settings.onDemandLibraries ? settings.onDemandLibraries : '—') %></dd>
             </dl>
 
-            <p class="mb-3">Change these values under <strong>Settings</strong> → <strong>MEDIA SERVER</strong> (poster cache section).</p>
+            <p class="mb-3">Configure servers and libraries under <strong>Settings → Media Server</strong>. Poster slides are served from the cache; sync fills it. *arr Coming Soon also registers into the cache.</p>
 
             <div class="border rounded p-3 mb-4 bg-light">
               <h6 class="text-uppercase text-muted small mb-2">Sync status</h6>
-              <p class="mb-2"><strong>Connected server type:</strong> <span id="syncServerType"><%= settings.mediaServerType ? settings.mediaServerType : 'plex' %></span></p>
+              <p class="mb-2"><strong>Configured media servers:</strong> <span id="syncServerType"><%
+                if (typeof mediaServerList !== 'undefined' && mediaServerList && mediaServerList.length) {
+                  %><%= mediaServerList.map(function(s){ return (s.name || s.host) + ' (' + s.type + ')'; }).join(', ') %><%
+                } else {
+                  %><%= settings.mediaServerType ? settings.mediaServerType : 'none' %><%
+                }
+              %></span></p>
               <div class="progress mb-2" style="height: 26px;">
                 <div id="syncProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%;" aria-valuemin="0" aria-valuemax="100"></div>
               </div>
@@ -195,7 +214,7 @@
             </form>
             <% } %>
 
-            <p class="small text-muted mb-0">Progress updates automatically while this page is open. You can leave and return; the server continues until finished. Details also appear in the PosterX console log.</p>
+            <p class="small text-muted mb-0">Progress updates automatically while this page is open. You can leave and return; the server continues until finished. Details also appear in the ScreenStage console log.</p>
           </div>
         </div>
       </div>

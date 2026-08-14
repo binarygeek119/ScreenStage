@@ -71,14 +71,17 @@ function prioritizeOdRaw(odRaw, retryKeys, serverKind) {
   return scored.map((s) => s.item);
 }
 
-function loadRetryKeys(serverKind) {
+function loadRetryKeys(serverKind, serverId) {
   try {
     if (!fs.existsSync(RETRY_FILE)) return [];
     const j = JSON.parse(fs.readFileSync(RETRY_FILE, "utf8"));
-    if (
-      !j ||
+    if (!j) return [];
+    const sid = String(serverId || "").trim();
+    if (sid) {
+      if (String(j.serverId || "").trim() !== sid) return [];
+    } else if (
       String(j.serverKind || "").toLowerCase() !==
-        String(serverKind || "").toLowerCase()
+      String(serverKind || "").toLowerCase()
     ) {
       return [];
     }
@@ -89,7 +92,7 @@ function loadRetryKeys(serverKind) {
   }
 }
 
-function saveRetryKeys(serverKind, keys) {
+function saveRetryKeys(serverKind, keys, serverId) {
   const uniq = [];
   const seen = new Set();
   for (const k of keys || []) {
@@ -99,17 +102,15 @@ function saveRetryKeys(serverKind, keys) {
     uniq.push(s);
     if (uniq.length >= MAX_KEYS) break;
   }
+  const payload = {
+    serverKind: String(serverKind || "").toLowerCase(),
+    serverId: String(serverId || "").trim(),
+    savedAt: new Date().toISOString(),
+    keys: uniq,
+  };
   try {
-    fs.mkdirSync(CACHE_ROOT, { recursive: true });
-    fs.writeFileSync(
-      RETRY_FILE,
-      JSON.stringify({
-        serverKind: String(serverKind || "").toLowerCase(),
-        savedAt: new Date().toISOString(),
-        keys: uniq,
-      }),
-      "utf8"
-    );
+    fs.mkdirSync(path.dirname(RETRY_FILE), { recursive: true });
+    fs.writeFileSync(RETRY_FILE, JSON.stringify(payload, null, 2), "utf8");
   } catch (e) {
     /* ignore */
   }

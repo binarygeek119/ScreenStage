@@ -3,6 +3,7 @@ const fsp = require("fs").promises;
 const DEFAULT_SETTINGS = require("../../consts");
 const util = require("../core/utility");
 const { requiresMediaServerCredential } = require("../mediaservers/mediaServerFactory");
+const mediaServersUtil = require("./mediaServers");
 
 /** Normalize form/JSON values to "true" | "false" for settings file (checkboxes, toggles). */
 function toSettingsBoolStr(value, fallback) {
@@ -34,6 +35,9 @@ class Settings {
     this.plexHTTPS = DEFAULT_SETTINGS.plexHTTPS;
     this.plexPort = DEFAULT_SETTINGS.plexPort;
     this.plexToken = DEFAULT_SETTINGS.plexToken;
+    this.mediaServers = Array.isArray(DEFAULT_SETTINGS.mediaServers)
+      ? DEFAULT_SETTINGS.mediaServers.slice()
+      : [];
     this.onDemandLibraries = DEFAULT_SETTINGS.onDemandLibraries;
     this.onDemand3dLibraries = DEFAULT_SETTINGS.onDemand3dLibraries;
     this.numberOnDemand = DEFAULT_SETTINGS.numberOnDemand;
@@ -166,28 +170,23 @@ class Settings {
    * @returns {<boolean>} true / false if any value is changed
    */
   GetChanged() {
-    let hasChanged = false;
-    let SettingChanged;
-    try {
-      // only worry about required media server settings (Kodi may omit token if no HTTP auth)
-      const tokenOk =
-        !requiresMediaServerCredential(this.mediaServerType) ||
-        (this.plexToken !== undefined && this.plexToken !== "");
-      if (this.plexIP !== "" && this.plexPort !== "" && tokenOk) {
-        hasChanged = true;
-        throw SettingChanged;
-      } else {
-        let now = new Date();
-        console.log(
-          now.toISOString().split("T")[0] +
-            " INVALID MEDIA SERVER SETTINGS - Please visit setup page to resolve"
-        );
-      }
-    } catch (e) {
-      if (e !== SettingChanged) throw e;
-    }
-
-    return hasChanged;
+    const list = mediaServersUtil.listConfiguredMediaServers(this);
+    if (list.length > 0) return true;
+    // Zero media servers is valid (*arr / cache-only)
+    const hasArr =
+      (this.sonarrURL && this.sonarrToken) ||
+      (this.radarrURL && this.radarrToken) ||
+      (this.lidarrURL && this.lidarrToken) ||
+      (this.readarrURL && this.readarrToken);
+    if (hasArr) return true;
+    // Cache-only also OK once settings file exists with intentional empty servers
+    if (Array.isArray(this.mediaServers)) return true;
+    let now = new Date();
+    console.log(
+      now.toISOString().split("T")[0] +
+        " No media servers or *arr configured — using cache / other sources"
+    );
+    return true;
   }
 
   /**
@@ -339,6 +338,17 @@ class Settings {
       if(readSettings.lidarrURL==undefined) readSettings.lidarrURL = '';
       if(readSettings.lidarrToken==undefined) readSettings.lidarrToken = '';
       if(readSettings.lidarrCalDays==undefined) readSettings.lidarrCalDays = 30;
+      // Multi media-server: migrate legacy flat plex* into mediaServers[]
+      if (!Array.isArray(readSettings.mediaServers)) {
+        readSettings.mediaServers =
+          mediaServersUtil.migrateLegacyToMediaServers(readSettings);
+      } else {
+        readSettings.mediaServers =
+          mediaServersUtil.normalizeMediaServersArray(
+            readSettings.mediaServers
+          );
+      }
+      mediaServersUtil.syncLegacyFlatFromMediaServers(readSettings);
     } catch (ex) {
       // do nothing if error as it reads ok anyhow
       let d = new Date();
@@ -347,6 +357,39 @@ class Settings {
 
     // populate settings object with settings from json file
     await Object.assign(this, readSettings);
+    if (!Array.isArray(this.mediaServers)) {
+      this.mediaServers = mediaServersUtil.migrateLegacyToMediaServers(this);
+    } else {
+      this.mediaServers = mediaServersUtil.normalizeMediaServersArray(
+        this.mediaServers
+      );
+    }
+    mediaServersUtil.syncLegacyFlatFromMediaServers(this);
+
+    // persist migrated mediaServers when upgraded from legacy flat fields
+    try {
+      if (
+        readSettings &&
+        Array.isArray(readSettings.mediaServers) &&
+        fs.existsSync("config/settings.json")
+      ) {
+        const disk = JSON.parse(
+          fs.readFileSync("config/settings.json", "utf-8")
+        );
+        if (!Array.isArray(disk.mediaServers)) {
+          await this.UpdateSettings({
+            mediaServers: this.mediaServers,
+            mediaServerType: this.mediaServerType,
+            plexIP: this.plexIP,
+            plexHTTPS: this.plexHTTPS,
+            plexPort: this.plexPort,
+            plexToken: this.plexToken,
+          });
+        }
+      }
+    } catch (e) {
+      /* non-fatal */
+    }
 
     // ensure settings loaded before returning
     return new Promise((resolve) => {
@@ -449,18 +492,50 @@ class Settings {
     else this.hideSettingsLinks = "false";
     if (jsonObject.theaterRoomMode) this.theaterRoomMode = jsonObject.theaterRoomMode;
     else this.theaterRoomMode = "false";
-    if (jsonObject.mediaServerType) this.mediaServerType = jsonObject.mediaServerType;
-    else this.mediaServerType = cs.mediaServerType != undefined ? cs.mediaServerType : DEFAULT_SETTINGS.mediaServerType;
-    if (jsonObject.plexIP) this.plexIP = jsonObject.plexIP;
-    else this.plexIP = cs.plexIP;
-    if (jsonObject.plexHTTPSSwitch) this.plexHTTPS = jsonObject.plexHTTPSSwitch;
-    else this.plexHTTPS = "false";
-    if (jsonObject.plexPort) this.plexPort = jsonObject.plexPort;
-    else this.plexPort = cs.plexPort;
-    if (jsonObject.plexToken !== undefined && jsonObject.plexToken !== null) {
-      this.plexToken = jsonObject.plexToken;
+    if (Object.prototype.hasOwnProperty.call(jsonObject, "mediaServers")) {
+      this.mediaServers = mediaServersUtil.normalizeMediaServersArray(
+        jsonObject.mediaServers
+      );
+      mediaServersUtil.syncLegacyFlatFromMediaServers(this);
+    } else if (
+      jsonObject.mediaServerType ||
+      jsonObject.plexIP ||
+      jsonObject.plexPort ||
+      jsonObject.plexToken !== undefined
+    ) {
+      // Legacy single-server form fields still accepted
+      if (jsonObject.mediaServerType)
+        this.mediaServerType = jsonObject.mediaServerType;
+      else
+        this.mediaServerType =
+          cs.mediaServerType != undefined
+            ? cs.mediaServerType
+            : DEFAULT_SETTINGS.mediaServerType;
+      if (jsonObject.plexIP) this.plexIP = jsonObject.plexIP;
+      else this.plexIP = cs.plexIP;
+      if (Object.prototype.hasOwnProperty.call(jsonObject, "plexHTTPSSwitch")) {
+        this.plexHTTPS = toSettingsBoolStr(jsonObject.plexHTTPSSwitch, "false");
+      } else {
+        this.plexHTTPS =
+          cs.plexHTTPS !== undefined ? cs.plexHTTPS : DEFAULT_SETTINGS.plexHTTPS;
+      }
+      if (jsonObject.plexPort) this.plexPort = jsonObject.plexPort;
+      else this.plexPort = cs.plexPort;
+      if (jsonObject.plexToken !== undefined && jsonObject.plexToken !== null) {
+        this.plexToken = jsonObject.plexToken;
+      } else {
+        this.plexToken = cs.plexToken;
+      }
+      if (!Array.isArray(this.mediaServers) || this.mediaServers.length === 0) {
+        this.mediaServers = mediaServersUtil.migrateLegacyToMediaServers(this);
+      }
     } else {
-      this.plexToken = cs.plexToken;
+      this.mediaServers = mediaServersUtil.normalizeMediaServersArray(
+        cs.mediaServers != null
+          ? cs.mediaServers
+          : mediaServersUtil.migrateLegacyToMediaServers(cs)
+      );
+      mediaServersUtil.syncLegacyFlatFromMediaServers(this);
     }
     if (jsonObject.plexLibraries)
       this.onDemandLibraries = jsonObject.plexLibraries;
@@ -1025,8 +1100,17 @@ class Settings {
           ? cs.posterCacheMinAgeBeforeChangeCheckMins
           : DEFAULT_SETTINGS.posterCacheMinAgeBeforeChangeCheckMins;
     }
-    if (jsonObject.preferCachedPosters) this.preferCachedPosters = jsonObject.preferCachedPosters;
-    else this.preferCachedPosters = "false";
+    if (Object.prototype.hasOwnProperty.call(jsonObject, "preferCachedPosters")) {
+      this.preferCachedPosters = toSettingsBoolStr(
+        jsonObject.preferCachedPosters,
+        "false"
+      );
+    } else {
+      this.preferCachedPosters =
+        cs.preferCachedPosters !== undefined
+          ? cs.preferCachedPosters
+          : DEFAULT_SETTINGS.preferCachedPosters;
+    }
     if (
       jsonObject.cachedPosterSlideCount !== undefined &&
       jsonObject.cachedPosterSlideCount !== null &&
