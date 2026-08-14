@@ -20,34 +20,32 @@
     @media (min-width: 768px) {
       .cache-chart-wrap.wide { height: 320px; }
     }
-    /* Keep cache dashboard readable when a dark theme is active. */
-    @media (prefers-color-scheme: dark) {
-      .card,
-      .card-body,
-      #cacheKindTable,
-      #posterDbTable,
-      #cacheStatusLine,
-      #cacheGenerated {
-        color: #f1f3f5;
-      }
-      .small.text-muted,
-      .text-muted {
-        color: #cfd4da !important;
-      }
-      #cacheKindTable.table-striped tbody tr:nth-of-type(odd),
-      #posterDbTable.table-striped tbody tr:nth-of-type(odd) {
-        background-color: rgba(255, 255, 255, 0.06);
-      }
-      #cacheSummary .bg-light {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border-color: rgba(255, 255, 255, 0.2) !important;
-      }
-      #cacheKindTable td,
-      #cacheKindTable th,
-      #posterDbTable td,
-      #posterDbTable th {
-        border-color: rgba(255, 255, 255, 0.15);
-      }
+    /* Keep cache dashboard readable on the Jellyfin-style dark theme. */
+    .card,
+    .card-body,
+    #cacheKindTable,
+    #posterDbTable,
+    #cacheStatusLine,
+    #cacheGenerated {
+      color: var(--jf-text, rgba(255,255,255,.87));
+    }
+    .small.text-muted,
+    .text-muted {
+      color: var(--jf-text-muted, rgba(255,255,255,.55)) !important;
+    }
+    #cacheKindTable.table-striped tbody tr:nth-of-type(odd),
+    #posterDbTable.table-striped tbody tr:nth-of-type(odd) {
+      background-color: rgba(255, 255, 255, 0.04);
+    }
+    #cacheSummary .bg-light {
+      background-color: var(--jf-surface-2, #242424) !important;
+      border-color: var(--jf-border, rgba(255,255,255,.1)) !important;
+    }
+    #cacheKindTable td,
+    #cacheKindTable th,
+    #posterDbTable td,
+    #posterDbTable th {
+      border-color: var(--jf-border, rgba(255,255,255,.1));
     }
   </style>
 </head>

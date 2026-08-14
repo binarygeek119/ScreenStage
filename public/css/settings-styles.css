@@ -364,3 +364,468 @@ body{margin-top:20px;
     .general > a:hover {
       color: #ebf0fa;
     }
+
+/* ------------------------------------------------------------------
+   Classic cinema skin on the Jellyfin-style dark dashboard
+   Velvet curtain red accent + thin brass/gold highlights
+   ------------------------------------------------------------------ */
+:root {
+  --jf-accent: #9b1b30;
+  --jf-accent-hover: #c41e3a;
+  --jf-accent-pressed: #6e1020;
+  --jf-gold: #c9a227;
+  --jf-gold-muted: rgba(201, 162, 39, 0.35);
+  --jf-bg: #101010;
+  --jf-header: #1a1416;
+  --jf-surface: #1c1c1c;
+  --jf-surface-2: #24181a;
+  --jf-raised: #303030;
+  --jf-raised-hover: #3b3b3b;
+  --jf-border: rgba(201, 162, 39, 0.22);
+  --jf-text: rgba(255, 255, 255, 0.87);
+  --jf-text-muted: rgba(255, 255, 255, 0.55);
+  --jf-danger: #e03c31;
+  --jf-radius: 0.2em;
+  --jf-pad-x: 1rem;
+  --jf-pad-y: 0.7rem;
+}
+
+body {
+  margin-top: 20px;
+  color: var(--jf-text);
+  background-color: var(--jf-bg);
+  background-image:
+    radial-gradient(ellipse at center, transparent 42%, rgba(28, 4, 8, 0.72) 100%),
+    linear-gradient(90deg, rgba(90, 10, 20, 0.32) 0%, transparent 14%, transparent 86%, rgba(90, 10, 20, 0.32) 100%);
+  background-attachment: fixed;
+  font-family: 'open_sansregular', 'Noto Sans', 'Open Sans', Helvetica Neue, Arial, sans-serif;
+}
+
+a {
+  color: var(--jf-accent);
+}
+a:hover {
+  color: var(--jf-accent-hover);
+}
+
+.breadcrumb {
+  background: var(--jf-header);
+  border-radius: var(--jf-radius);
+  border-bottom: 1px solid var(--jf-gold-muted);
+  padding: 0.75rem 1.15rem;
+}
+.breadcrumb-item,
+.breadcrumb-item.active {
+  color: var(--jf-text-muted);
+}
+.breadcrumb-item a {
+  color: var(--jf-accent);
+}
+.breadcrumb-item + .breadcrumb-item::before {
+  color: var(--jf-text-muted);
+}
+
+.card,
+.card-body,
+.card-header {
+  background: var(--jf-surface);
+  color: var(--jf-text);
+  border-color: var(--jf-border);
+  border-radius: 0.3em;
+}
+.card {
+  border: 1px solid var(--jf-border);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(40, 0, 8, 0.35);
+}
+.card-body {
+  padding: 1.35rem 1.5rem;
+}
+.card-header {
+  background: var(--jf-header);
+  padding: 0.85rem 1.25rem;
+}
+
+.form-group {
+  margin-bottom: 1.15rem;
+}
+.form-group label {
+  margin-bottom: 0.45rem;
+  display: inline-block;
+}
+.form-text,
+small.form-text {
+  margin-top: 0.4rem;
+  padding: 0 0.15rem;
+  line-height: 1.45;
+}
+
+.form-control,
+.custom-select,
+select.form-control,
+textarea.form-control {
+  background: var(--jf-bg);
+  color: var(--jf-text);
+  border: 1px solid var(--jf-border);
+  border-radius: var(--jf-radius);
+  padding: var(--jf-pad-y) var(--jf-pad-x);
+  height: auto;
+  line-height: 1.45;
+}
+.form-control:focus,
+.custom-select:focus {
+  background: var(--jf-bg);
+  color: var(--jf-text);
+  border-color: var(--jf-accent);
+  box-shadow: 0 0 0 0.12rem rgba(155, 27, 48, 0.4);
+}
+.form-control::placeholder {
+  color: var(--jf-text-muted);
+}
+.form-text,
+.text-muted,
+small {
+  color: var(--jf-text-muted) !important;
+}
+label,
+.custom-control-label {
+  color: var(--jf-text);
+}
+
+.custom-control {
+  padding-left: 2.75rem;
+  min-height: 1.75rem;
+  margin-bottom: 0.85rem;
+}
+.custom-control-label {
+  padding-top: 0.15rem;
+  padding-left: 0.45rem;
+  line-height: 1.45;
+}
+.custom-switch .custom-control-label::before {
+  left: -2.75rem;
+  top: 0.2rem;
+  width: 2.15rem;
+  height: 1.15rem;
+  border-radius: 1.15rem;
+}
+.custom-switch .custom-control-label::after {
+  top: calc(0.2rem + 2px);
+  left: calc(-2.75rem + 2px);
+  width: calc(1.15rem - 4px);
+  height: calc(1.15rem - 4px);
+  border-radius: 1.15rem;
+}
+.custom-switch .custom-control-input:checked ~ .custom-control-label::after {
+  transform: translateX(1rem);
+}
+.custom-control-label::before {
+  top: 0.2rem;
+}
+
+.custom-control-input:checked ~ .custom-control-label::before {
+  background-color: var(--jf-accent);
+  border-color: var(--jf-accent);
+}
+.custom-switch .custom-control-input:checked ~ .custom-control-label::before {
+  background-color: var(--jf-accent);
+  border-color: var(--jf-accent);
+}
+.custom-control-input:focus ~ .custom-control-label::before {
+  box-shadow: 0 0 0 0.15rem rgba(155, 27, 48, 0.4);
+}
+
+.nav-pills .nav-link,
+.nav-tabs .nav-link {
+  color: var(--jf-text-muted);
+  border-radius: var(--jf-radius);
+  padding: 0.7rem 1rem;
+}
+.nav-pills .nav-link:hover,
+.nav-tabs .nav-link:hover {
+  color: var(--jf-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link,
+.nav-tabs .nav-link.active {
+  color: #fff;
+  background: var(--jf-accent);
+}
+.nav-tabs {
+  border-bottom-color: var(--jf-border);
+}
+.nav-tabs .nav-link.active {
+  border-color: var(--jf-accent) var(--jf-accent) var(--jf-surface);
+  background: var(--jf-surface);
+  color: var(--jf-accent);
+}
+.nav-link-faded i.fal,
+.nav-link-faded i.fas {
+  float: none;
+  margin-right: 0.55rem;
+}
+span.menu {
+  padding-left: 0;
+}
+
+.panel-title > a,
+.panel-title > a.collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.35rem;
+  color: var(--jf-text);
+  line-height: 1.35;
+}
+.panel-title > a:hover {
+  color: var(--jf-gold);
+}
+.accordion .card,
+.panel-group .panel {
+  background: var(--jf-surface-2);
+  border: 1px solid var(--jf-border);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+.panel-group .panel + .panel {
+  margin-top: 0;
+}
+.panel-heading {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.panel-collapse .panel-body,
+.collapse .card-body {
+  padding: 1.15rem 1.35rem 1.35rem;
+}
+.panel-title {
+  margin: 0;
+}
+.panel-title > a .accordion_icon,
+.panel-title > a i.fal,
+.panel-title > a i.fas {
+  float: none;
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+hr {
+  border-top-color: var(--jf-border);
+}
+
+.dropdown-menu {
+  background-color: var(--jf-surface-2);
+  border: 1px solid var(--jf-border);
+  color: var(--jf-text);
+}
+.dropdown-item {
+  color: var(--jf-text);
+}
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: rgba(155, 27, 48, 0.22);
+  color: #fff;
+}
+.checkbox-menu li label {
+  color: var(--jf-text);
+}
+.checkbox-menu li.active label,
+.checkbox-menu li label:hover,
+.checkbox-menu li label:focus,
+.checkbox-menu li.active label:hover,
+.checkbox-menu li.active label:focus {
+  background-color: rgba(155, 27, 48, 0.22);
+  color: #fff;
+}
+
+.alert {
+  border-radius: var(--jf-radius);
+  border: 0;
+}
+.alert-secondary {
+  background: var(--jf-surface-2);
+  color: var(--jf-text);
+}
+.alert-warning {
+  background: #3a2e14;
+  color: #f3e2a8;
+}
+.alert-danger,
+.card.border-danger {
+  background: #2a1515;
+  color: var(--jf-text);
+  border-color: var(--jf-danger) !important;
+}
+
+.table {
+  color: var(--jf-text);
+}
+.table td,
+.table th {
+  border-color: var(--jf-border);
+}
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+.bg-light {
+  background-color: var(--jf-surface-2) !important;
+  color: var(--jf-text) !important;
+}
+
+.modal-content {
+  background: var(--jf-surface);
+  color: var(--jf-text);
+  border: 1px solid var(--jf-border);
+}
+.modal-header,
+.modal-footer {
+  border-color: var(--jf-border);
+}
+.close {
+  color: var(--jf-text);
+  text-shadow: none;
+  opacity: 0.7;
+}
+
+#rcorners,
+#rcorners-u,
+#rcorners-e {
+  background: var(--jf-surface-2);
+  border-color: var(--jf-border);
+  color: var(--jf-text);
+}
+#message {
+  color: var(--jf-accent);
+}
+
+/* Buttons — Jellyfin raised / submit look */
+.btn {
+  border: 0;
+  border-radius: var(--jf-radius);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.7em 1.35em;
+  line-height: 1.35;
+  box-shadow: none;
+}
+.btn:focus {
+  box-shadow: 0 0 0 0.15rem rgba(155, 27, 48, 0.4);
+}
+
+.btn-primary,
+.btn-info,
+.btn-success,
+.btn-danger {
+  background: var(--jf-accent);
+  color: #fff;
+}
+.btn-primary:hover,
+.btn-info:hover,
+.btn-success:hover,
+.btn-danger:hover,
+.btn-primary:focus,
+.btn-info:focus,
+.btn-success:focus,
+.btn-danger:focus {
+  background: var(--jf-accent-hover);
+  color: #fff;
+}
+.btn-primary:active,
+.btn-info:active,
+.btn-success:active,
+.btn-danger:active,
+.btn-primary:not(:disabled):not(.disabled):active,
+.btn-info:not(:disabled):not(.disabled):active,
+.btn-success:not(:disabled):not(.disabled):active,
+.btn-danger:not(:disabled):not(.disabled):active {
+  background: var(--jf-accent-pressed);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: var(--jf-raised);
+  color: #fff;
+}
+.btn-secondary:hover,
+.btn-secondary:focus {
+  background: var(--jf-raised-hover);
+  color: #fff;
+}
+
+.btn-outline-primary,
+.btn-outline-info,
+.btn-outline-success,
+.btn-outline-secondary {
+  background: transparent;
+  color: var(--jf-accent);
+  border: 1px solid var(--jf-accent);
+  box-shadow: none;
+}
+.btn-outline-primary:hover,
+.btn-outline-info:hover,
+.btn-outline-success:hover,
+.btn-outline-secondary:hover,
+.btn-outline-primary:focus,
+.btn-outline-info:focus,
+.btn-outline-success:focus,
+.btn-outline-secondary:focus {
+  background: var(--jf-accent);
+  color: #fff;
+  border-color: var(--jf-accent);
+}
+
+.btn-outline-danger,
+.btn-outline-warning {
+  background: transparent;
+  color: #ff8a80;
+  border: 1px solid var(--jf-danger);
+}
+.btn-outline-danger:hover,
+.btn-outline-warning:hover,
+.btn-outline-danger:focus,
+.btn-outline-warning:focus {
+  background: var(--jf-danger);
+  color: #fff;
+  border-color: var(--jf-danger);
+}
+
+.btn-sm {
+  padding: 0.5em 1em;
+  font-size: 0.78rem;
+}
+
+.ms-card {
+  border: 1px solid var(--jf-border);
+  border-radius: 0.3em;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  background: var(--jf-bg);
+}
+.ms-card h5 {
+  color: var(--jf-text);
+}
+.ms-add-btn {
+  border: 1px solid var(--jf-accent);
+  border-radius: var(--jf-radius);
+  background: transparent;
+  color: var(--jf-accent);
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: .55em 1em;
+}
+.ms-add-btn:hover,
+.ms-add-btn:focus {
+  background: var(--jf-accent);
+  border-color: var(--jf-accent);
+  color: #fff;
+}

@@ -1,69 +1,117 @@
- /* custom styling for all FA icons  */
+/* custom styling for all FA icons  */
 i.fas,
 i.fal,
 i.fab {
     font-size: 24px;
 }
 
-.breadcrumb {
-    background: #1c2133;
+:root {
+  --jf-accent: #9b1b30;
+  --jf-accent-hover: #c41e3a;
+  --jf-gold: #c9a227;
+  --jf-gold-muted: rgba(201, 162, 39, 0.35);
+  --jf-bg: #101010;
+  --jf-header: #1a1416;
+  --jf-surface: #1c1c1c;
+  --jf-border: rgba(201, 162, 39, 0.22);
+  --jf-text: rgba(255, 255, 255, 0.87);
+  --jf-text-muted: rgba(255, 255, 255, 0.55);
+  --jf-radius: 0.2em;
 }
 
-/* .d-block {
-    text-decoration: underline;
-} */
+.breadcrumb {
+    background: var(--jf-header);
+}
 
 span.menu {
     padding-left: 12px;
     vertical-align: top;
 }
 
-body{margin-top:20px;
-    color: #4336fd;
-        background: #1c2133;
-    }
-    .account-settings .user-profile {
-        margin: 0 0 1rem 0;
-        padding-bottom: 1rem;
-        text-align: center;
-    }
-    .account-settings .user-profile .user-avatar {
-        margin: 0 0 1rem 0;
-    }
-    .account-settings .user-profile .user-avatar img {
-        width: 90px;
-        height: 90px;
-        -webkit-border-radius: 100px;
-        -moz-border-radius: 100px;
-        border-radius: 100px;
-    }
-    .account-settings .user-profile h5.user-name {
-        margin: 0 0 0.5rem 0;
-    }
-    .account-settings .user-profile h6.user-email {
-        margin: 0;
-        font-size: 0.8rem;
-        font-weight: 400;
-    }
-    .account-settings .about {
-        margin: 1rem 0 0 0;
-        font-size: 0.8rem;
-        text-align: center;
-    }
-    .card {
-        background: #1c2133;
-        -webkit-border-radius: 5px;
-        -moz-border-radius: 5px;
-        border-radius: 5px;
-        border: 0;
-        margin-bottom: 1rem;
-    }
-    .form-control {
-        border: 1px solid #596280;
-        -webkit-border-radius: 2px;
-        -moz-border-radius: 2px;
-        border-radius: 2px;
-        font-size: .825rem;
-        background: #0d111d;
-        color: #bcd0f7;
-    }
+body {
+    margin-top: 20px;
+    color: var(--jf-text);
+    background-color: var(--jf-bg);
+    background-image:
+      radial-gradient(ellipse at center, transparent 42%, rgba(28, 4, 8, 0.72) 100%),
+      linear-gradient(90deg, rgba(90, 10, 20, 0.32) 0%, transparent 14%, transparent 86%, rgba(90, 10, 20, 0.32) 100%);
+    background-attachment: fixed;
+    font-family: 'open_sansregular', 'Noto Sans', 'Open Sans', Helvetica Neue, Arial, sans-serif;
+}
+
+a {
+    color: var(--jf-accent);
+}
+a:hover {
+    color: var(--jf-accent-hover);
+}
+
+.account-settings .user-profile {
+    margin: 0 0 1rem 0;
+    padding-bottom: 1rem;
+    text-align: center;
+}
+.account-settings .user-profile .user-avatar {
+    margin: 0 0 1rem 0;
+}
+.account-settings .user-profile .user-avatar img {
+    width: 90px;
+    height: 90px;
+    border-radius: 100px;
+}
+.account-settings .user-profile h5.user-name {
+    margin: 0 0 0.5rem 0;
+}
+.account-settings .user-profile h6.user-email {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+.account-settings .about {
+    margin: 1rem 0 0 0;
+    font-size: 0.8rem;
+    text-align: center;
+}
+.card {
+    background: var(--jf-surface);
+    border-radius: 0.3em;
+    border: 1px solid var(--jf-border);
+    margin-bottom: 1rem;
+    color: var(--jf-text);
+}
+.form-control {
+    border: 1px solid var(--jf-border);
+    border-radius: var(--jf-radius);
+    font-size: .825rem;
+    background: var(--jf-bg);
+    color: var(--jf-text);
+}
+.form-control:focus {
+    background: var(--jf-bg);
+    color: var(--jf-text);
+    border-color: var(--jf-accent);
+    box-shadow: 0 0 0 0.12rem rgba(155, 27, 48, 0.4);
+}
+
+.btn {
+    border: 0;
+    border-radius: var(--jf-radius);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.55em 1em;
+}
+.btn-info,
+.btn-primary,
+.btn-success,
+.btn-danger {
+    background: var(--jf-accent);
+    color: #fff;
+}
+.btn-info:hover,
+.btn-primary:hover,
+.btn-success:hover,
+.btn-danger:hover {
+    background: var(--jf-accent-hover);
+    color: #fff;
+}
