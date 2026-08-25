@@ -1314,7 +1314,7 @@
     var savedCategories = [];
     // load posted form data
     <%if(typeof formData !== 'undefined' && errors){%>
-      formCategories = '<%=formData.triviaCategories%>'.split(',')%>;
+      formCategories = <%- JSON.stringify(String(formData.triviaCategories || "")) %>.split(',')%>;
       formCategories.forEach(function(id){
         $('[name="triviaCategories"]').each( function() {   
           if ( $(this).val() ==   id ){
@@ -1330,7 +1330,7 @@
       });
     <%}else{%>
       // load saved trivia selections
-      savedCategories = '<%=settings.triviaCategories%>'.split(',')%>;
+      savedCategories = <%- JSON.stringify(String(settings.triviaCategories || "")) %>.split(',')%>;
       savedCategories.forEach(function(id){
         $('[name="triviaCategories"]').each( function() {   
           if ( $(this).val() ==   id ){

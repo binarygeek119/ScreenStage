@@ -1,4 +1,6 @@
 const express = require("express");
+const crypto = require("crypto");
+const os = require("os");
 const path = require("path");
 const app = express();
 const multer = require("multer");
@@ -97,6 +99,17 @@ let csbCards = [];
 let trivCards = [];
 let linkCards = [];
 let globalPage = new glb();
+/** Per-process offset so multiple ScreenStage containers desync poster rotation. */
+let deckBuildGeneration = 0;
+const INSTANCE_DISPLAY_OFFSET = (() => {
+  const host = String(os.hostname() || "");
+  let h = 0;
+  for (let i = 0; i < host.length; i++) {
+    h = (Math.imul(31, h) + host.charCodeAt(i)) >>> 0;
+  }
+  return (h + crypto.randomInt(0, 1000000)) >>> 0;
+})();
+console.log(" Display instance offset: " + INSTANCE_DISPLAY_OFFSET);
 let nowScreeningClock;
 let onDemandClock;
 let triviaClock;
@@ -957,9 +970,73 @@ function libraryCardsWithoutArrOverlap(libraryCards, arrCards) {
 }
 
 function shuffleCardArray(cards) {
-  return (Array.isArray(cards) ? cards.slice() : []).sort(
-    () => Math.random() - 0.5
-  );
+  return util.fisherYatesShuffle(Array.isArray(cards) ? cards.slice() : []);
+}
+
+function cardTypeLabel(card) {
+  const ct = card && card.cardType;
+  return Array.isArray(ct) ? String(ct[0] || "") : String(ct || "");
+}
+
+function isNowScreeningHomeCard(card) {
+  const n = cardTypeLabel(card).toLowerCase();
+  return n === "now screening" || n === "playing";
+}
+
+function instanceTimerJitterMs(baseMs) {
+  const base = Math.max(1000, Math.floor(Number(baseMs) || 0));
+  const cap = Math.max(1, Math.floor(base * 0.2));
+  return base + (INSTANCE_DISPLAY_OFFSET % cap);
+}
+
+/** Keep Now Playing pinned first; shuffle and rotate the rest per instance. */
+function finalizeHomeDeck(cards) {
+  if (!Array.isArray(cards) || cards.length <= 1) return cards;
+  deckBuildGeneration += 1;
+  const pinned = [];
+  const rest = [];
+  for (const c of cards) {
+    if (isNowScreeningHomeCard(c)) pinned.push(c);
+    else rest.push(c);
+  }
+  if (rest.length <= 1) return cards;
+  let varied = util.fisherYatesShuffle(rest.slice());
+  const offset = (INSTANCE_DISPLAY_OFFSET + deckBuildGeneration) % varied.length;
+  varied = util.rotateArray(varied, offset);
+  return pinned.concat(varied);
+}
+
+/** Library count for on-demand slide cap validation (main settings no longer posts plexLibraries). */
+function countOnDemandLibrariesForSaveValidation(req) {
+  const body = req && req.body ? req.body : {};
+  const legacy = body.plexLibraries;
+  if (legacy !== undefined && legacy !== null && String(legacy).trim() !== "") {
+    return String(legacy)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .length;
+  }
+  const settings = loadedSettings || {};
+  const servers = mediaServersUtil.listSyncMediaServers(settings);
+  let total = 0;
+  for (const server of servers) {
+    total += String(server.libraries || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .length;
+  }
+  if (total > 0) return total;
+  const savedLibs = String(settings.onDemandLibraries || "").trim();
+  if (savedLibs) {
+    return savedLibs
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .length;
+  }
+  return 1;
 }
 
 /**
@@ -1541,7 +1618,7 @@ async function warmCachedPosterDeckEarlyIfPossible() {
     displayIds.length ? displayIds : null
   );
   if (!cached.length) return;
-  globalPage.cards = cached.slice();
+  globalPage.cards = finalizeHomeDeck(cached.slice());
   try {
     await globalPage.OrderAndRenderCards(
       BASEURL,
@@ -1581,7 +1658,7 @@ async function warmCachedPosterDeckEarlyIfPossible() {
         ? loadedSettings.displayPosterArtist
         : "false"
     );
-    globalPage.slideDuration = loadedSettings.slideDuration * 1000;
+    globalPage.slideDuration = instanceTimerJitterMs(loadedSettings.slideDuration * 1000);
     globalPage.playThemes = loadedSettings.playThemes;
     globalPage.playGenericThemes = loadedSettings.genericThemes;
     globalPage.fadeTransition =
@@ -1883,13 +1960,13 @@ async function loadNowScreening() {
   if (adsOnlyOn) {
     mCards = adSlideCards.slice();
     if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-      mCards = mCards.sort(() => Math.random() - 0.5);
+      mCards = shuffleCardArray(mCards);
     }
     globalPage.cards = mCards;
   } else if (nowShowingListOnlyOn) {
     mCards = tmdbNowShowingPosterCards.slice();
     if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-      mCards = mCards.sort(() => Math.random() - 0.5);
+      mCards = shuffleCardArray(mCards);
     }
     globalPage.cards = mCards;
   } else {
@@ -1950,7 +2027,7 @@ async function loadNowScreening() {
     } else {
       if (csCards.length > 0) {
         if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-          mCards = csCards.concat(csrCards.concat(cslCards).concat(picCards).concat(csbCards).concat(linkCards).concat(trivCards)).sort(() => Math.random() - 0.5);
+          mCards = shuffleCardArray(csCards.concat(csrCards.concat(cslCards).concat(picCards).concat(csbCards).concat(linkCards).concat(trivCards)));
         }
         else {
           mCards = csCards.concat(csrCards);
@@ -1964,7 +2041,7 @@ async function loadNowScreening() {
       } else {
         if (csrCards.length > 0) {
           if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-            mCards = csrCards.concat(cslCards.concat(picCards).concat(csbCards).concat(linkCards).concat(trivCards)).sort(() => Math.random() - 0.5);
+            mCards = shuffleCardArray(csrCards.concat(cslCards.concat(picCards).concat(csbCards).concat(linkCards).concat(trivCards)));
           }
           else {
             mCards = csrCards.concat(cslCards);
@@ -1980,7 +2057,7 @@ async function loadNowScreening() {
         else {
           if (cslCards.length > 0) {
             if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-              mCards = cslCards.concat(picCards.concat(csbCards).concat(linkCards).concat(trivCards)).sort(() => Math.random() - 0.5);
+              mCards = shuffleCardArray(cslCards.concat(picCards.concat(csbCards).concat(linkCards).concat(trivCards)));
             } else {
               mCards = cslCards.concat(picCards);
               mCards = mCards.concat(csbCards);
@@ -1990,7 +2067,7 @@ async function loadNowScreening() {
             globalPage.cards = mCards;
           } else if (csbCards.length > 0) {
             if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-              mCards = csbCards.concat(picCards.concat(trivCards)).concat(linkCards).sort(() => Math.random() - 0.5);
+              mCards = shuffleCardArray(csbCards.concat(picCards.concat(trivCards)).concat(linkCards));
             }
             else {
               mCards = csbCards.concat(picCards);
@@ -2002,7 +2079,7 @@ async function loadNowScreening() {
           else {
             if(picCards.length > 0) {
               if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-                mCards = picCards.concat(trivCards).concat(linkCards).sort(() => Math.random() - 0.5);
+                mCards = shuffleCardArray(picCards.concat(trivCards).concat(linkCards));
               }
               else {
                 mCards = picCards.concat(trivCards);
@@ -2012,7 +2089,7 @@ async function loadNowScreening() {
             }
             else {
               if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-                mCards = trivCards.concat(linkCards).sort(() => Math.random() - 0.5);
+                mCards = shuffleCardArray(trivCards.concat(linkCards));
               }
               else {
                 mCards = trivCards;
@@ -2110,6 +2187,7 @@ async function loadNowScreening() {
 
   // put everything into global class, ready to be passed to poster.ejs
   // render html for all cards
+  globalPage.cards = finalizeHomeDeck(globalPage.cards);
   await globalPage.OrderAndRenderCards(
     BASEURL,
     loadedSettings.hasArt,
@@ -2150,7 +2228,7 @@ async function loadNowScreening() {
       ? loadedSettings.displayPosterArtist
       : "false"
   );
-  globalPage.slideDuration = loadedSettings.slideDuration * 1000;
+  globalPage.slideDuration = instanceTimerJitterMs(loadedSettings.slideDuration * 1000);
   globalPage.playThemes = loadedSettings.playThemes;
   globalPage.playGenericThemes = loadedSettings.genericThemes;
   globalPage.fadeTransition =
@@ -2165,7 +2243,7 @@ async function loadNowScreening() {
   globalPage.rotate = loadedSettings.rotate !== undefined ? loadedSettings.rotate : "false";
 
   // restart the clock
-  nowScreeningClock = setInterval(loadNowScreening, pollInterval);
+  nowScreeningClock = setInterval(loadNowScreening, instanceTimerJitterMs(pollInterval));
   return nsCards;
 }
 
@@ -2465,7 +2543,7 @@ async function loadOnDemand() {
     const nextMs = isNaN(odCheckMinutes)
       ? 30 * 60 * 1000
       : Math.max(10, odCheckMinutes) * 60000;
-    onDemandClock = setInterval(loadOnDemand, nextMs);
+    onDemandClock = setInterval(loadOnDemand, instanceTimerJitterMs(nextMs));
     return odCards;
   }
   // stop the clock
@@ -2484,7 +2562,7 @@ async function loadOnDemand() {
     odCheckMinutes = 1;
     console.log("✘✘ WARNING ✘✘ - Next on-demand query will run in 1 minute.");
     // restart interval timer
-    onDemandClock = setInterval(loadOnDemand, odCheckMinutes * 60000);
+    onDemandClock = setInterval(loadOnDemand, instanceTimerJitterMs(odCheckMinutes * 60000));
 
     return odCards;
   }
@@ -2497,15 +2575,13 @@ async function loadOnDemand() {
   }
 
   // restart interval timer
-  onDemandClock = setInterval(loadOnDemand, odCheckMinutes * 60000);
+  onDemandClock = setInterval(loadOnDemand, instanceTimerJitterMs(odCheckMinutes * 60000));
 
   // randomise on-demand results for all libraries queried
   if (loadedSettings.shuffleSlides !== undefined && loadedSettings.shuffleSlides == "true") {
-    return odCards.sort(() => Math.random() - 0.5);
+    return finalizeHomeDeck(shuffleCardArray(odCards));
   }
-  else {
-    return odCards;
-  }
+  return finalizeHomeDeck(odCards);
 
 }
 
@@ -6496,9 +6572,7 @@ app.post(
       .isEmpty()
       .withMessage("'Number to Display' must be 0 or more. (setting default)")
       .custom((value, { req }) => {
-        if (value !== undefined && value !== "" && parseInt(value) !== "NaN") {
-          // make sure there are limited slides requested
-          let numOfLibraries = 0;
+        if (value !== undefined && value !== "" && !isNaN(parseInt(value, 10))) {
           let themeMessage;
 
           // double the slide count if tv and movie themes are off
@@ -6509,39 +6583,56 @@ app.post(
             themeMessage = "";
           }
           else {
-            maxSlide = MAX_OD_SLIDES;
+            maxSlides = MAX_OD_SLIDES;
             themeMessage = "(when themes enabled)";
           }
 
-          if (req.body.plexLibraries !== undefined || req.body.plexLibraries !== "") {
-            numberOfLibraries = req.body.plexLibraries.split(",").length;
-            if (parseInt(value) * numberOfLibraries > maxSlides) {
+          try {
+            const numberOfLibraries = countOnDemandLibrariesForSaveValidation(req);
+            if (
+              numberOfLibraries > 0 &&
+              parseInt(value, 10) * numberOfLibraries > maxSlides
+            ) {
               let estimatedNumber = parseInt(maxSlides / numberOfLibraries);
               throw new Error("'Number to Display' cannot be more than '" + estimatedNumber + "' for '" + numberOfLibraries + "' libraries " + themeMessage);
             }
+          } catch (e) {
+            if (e && e.message && String(e.message).indexOf("Number to Display") !== -1) {
+              throw e;
+            }
+            // Ignore unexpected validation-shape errors (e.g. missing legacy form fields).
           }
         }
-        // Indicates the success of this synchronous custom validator
         return true;
       }),
     check("enableSleep")
       .custom((value, { req }) => {
-        if(value == "true"){
-          if(req.body.sleepStart.length == 0) throw new Error("You must specify sleep start and end times if the sleep timer is enabled");
-        }
-        if(value == "true"){
-          if(req.body.sleepEnd.length == 0) throw new Error("You must specify sleep start and end times if the sleep timer is enabled");
+        if (value == "true") {
+          const start = req.body.sleepStart != null ? String(req.body.sleepStart) : "";
+          const end = req.body.sleepEnd != null ? String(req.body.sleepEnd) : "";
+          if (start.length == 0) {
+            throw new Error("You must specify sleep start and end times if the sleep timer is enabled");
+          }
+          if (end.length == 0) {
+            throw new Error("You must specify sleep start and end times if the sleep timer is enabled");
+          }
         }
         return true;
       }),
     check("sleepStart")
-      .custom((value, { req }) => {
-        if(isNaN(Date.parse("2100-01-01T" + value)) == true && value.length !== 0) throw new Error("Sleep start time must be in 24 hour format hh:mm (eg. 07:15 or 23:30)");
+      .custom((value) => {
+        const v = value != null ? String(value) : "";
+        if (isNaN(Date.parse("2100-01-01T" + v)) == true && v.length !== 0) {
+          throw new Error("Sleep start time must be in 24 hour format hh:mm (eg. 07:15 or 23:30)");
+        }
         return true;
       }),
     check("sleepEnd")
-      .custom((value, { req }) => {
-        if(isNaN(Date.parse("2100-01-01T" + value)) == true && value.length !== 0) throw new Error("Sleep end time must be in 24 hour format hh:mm (eg. 07:15 or 23:30)");
+      .custom((value) => {
+        const v = value != null ? String(value) : "";
+        if (isNaN(Date.parse("2100-01-01T" + v)) == true && v.length !== 0) {
+          throw new Error("Sleep end time must be in 24 hour format hh:mm (eg. 07:15 or 23:30)");
+        }
         return true;
       }),
     check("sonarrUrl")
