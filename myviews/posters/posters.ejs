@@ -337,6 +337,7 @@ function startInactivityCheck(element, delay, callbackInactivity, callbackActive
         });
 
         $(".cardHolder").html(cardHtml);
+        startCarouselAtRandomSlide();
         initialLoad();
 
         // check if there is only one card showing and if so, schedule a data refresh after the slide duration period has passed.
@@ -427,6 +428,19 @@ function startInactivityCheck(element, delay, callbackInactivity, callbackActive
   };
 
   // apply styles to cards and manage audio
+  function startCarouselAtRandomSlide() {
+    var items = $(".carousel-item");
+    if (items.length <= 1) {
+      curPlayID = 1;
+      return;
+    }
+    var startIdx = Math.floor(Math.random() * items.length);
+    items.removeClass("active");
+    items.eq(startIdx).addClass("active");
+    var slideId = items.eq(startIdx).attr("id");
+    curPlayID = slideId ? slideId : 1;
+  }
+
   function initialLoad() {
     <%if(globals.hideSettingsLinks !== undefined && globals.hideSettingsLinks == 'true'){ 
       // do nothing
@@ -449,8 +463,8 @@ function startInactivityCheck(element, delay, callbackInactivity, callbackActive
     StopAllAudio();
     
     //trigger initial audio play if present
-    if (document.getElementById("audio1")) {
-      var x = document.getElementById("audio1");
+    if (document.getElementById("audio" + curPlayID)) {
+      var x = document.getElementById("audio" + curPlayID);
       // set volume to 0 and position 1 second in
       x.volume = 0;
       x.currentTime = 0;
@@ -463,12 +477,12 @@ function startInactivityCheck(element, delay, callbackInactivity, callbackActive
       aud_fadeIn(x);
 
       // check if trivia slide and if so, pause carousel and start timer
-      isQuiz(1);
+      isQuiz(curPlayID);
     }
 
     // check if marquee is needed
-    var marquee = document.getElementById("marquee1");
-    var tagLine = document.getElementById("tagLine1");
+    var marquee = document.getElementById("marquee" + curPlayID);
+    var tagLine = document.getElementById("tagLine" + curPlayID);
     if(tagLine !== null){
       if(tagLine.scrollHeight > tagLine.clientHeight || tagLine.scrollWidth > tagLine.clientWidth){
         marquee.start();
@@ -478,7 +492,7 @@ function startInactivityCheck(element, delay, callbackInactivity, callbackActive
       }
     }
 
-    Resize(1);
+    Resize(curPlayID);
   }
 
   $(function () {

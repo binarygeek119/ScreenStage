@@ -23,6 +23,28 @@ class utility {
     });
   }
 
+  /** Fisher–Yates in-place shuffle; returns the same array reference. */
+  static fisherYatesShuffle(items) {
+    const arr = Array.isArray(items) ? items : [];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = arr[i];
+      arr[i] = arr[j];
+      arr[j] = t;
+    }
+    return arr;
+  }
+
+  /** Return a new array rotated left by offset (wraps). */
+  static rotateArray(items, offset) {
+    const arr = Array.isArray(items) ? items.slice() : [];
+    const len = arr.length;
+    if (len <= 1) return arr;
+    const n = ((Number(offset) || 0) % len + len) % len;
+    if (n === 0) return arr;
+    return arr.slice(n).concat(arr.slice(0, n));
+  }
+
   /** Escape text for safe insertion into HTML attribute or body context */
   static escapeHtml(str) {
     if (str == null || str === "") return "";

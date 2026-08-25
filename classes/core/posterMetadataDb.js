@@ -1,4 +1,6 @@
 const fs = require("fs");
+const os = require("os");
+const crypto = require("crypto");
 const path = require("path");
 const Cache = require("./cache");
 const MediaCard = require("../cards/MediaCard");
@@ -21,6 +23,15 @@ const MP3CACHE = path.join(CACHE_ROOT, "mp3cache");
 const MAX_ENTRIES = 100000;
 const MIN_FILE_BYTES = 256;
 const DEFAULT_FALLBACK_COUNT = 24;
+
+const POSTER_PICK_INSTANCE_OFFSET = (() => {
+  const host = String(os.hostname() || "");
+  let h = 0;
+  for (let i = 0; i < host.length; i++) {
+    h = (Math.imul(31, h) + host.charCodeAt(i)) >>> 0;
+  }
+  return (h + crypto.randomInt(0, 1000000)) >>> 0;
+})();
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS poster_entries (
@@ -1066,6 +1077,10 @@ function pickRandomEntries(count, serverKindOpt, hideContentRatings, serverIdsOp
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const rotateBy = POSTER_PICK_INSTANCE_OFFSET % shuffled.length;
+  if (rotateBy > 0) {
+    return shuffled.slice(rotateBy).concat(shuffled.slice(0, rotateBy)).slice(0, Math.min(count, shuffled.length));
   }
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
