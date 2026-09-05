@@ -978,6 +978,19 @@ function cardTypeLabel(card) {
   return Array.isArray(ct) ? String(ct[0] || "") : String(ct || "");
 }
 
+function screenOrientationFromSettings() {
+  return {
+    rotate:
+      loadedSettings && loadedSettings.rotate !== undefined
+        ? loadedSettings.rotate
+        : "false",
+    rotateLeft:
+      loadedSettings && loadedSettings.rotateLeft !== undefined
+        ? loadedSettings.rotateLeft
+        : "false",
+  };
+}
+
 function isNowScreeningHomeCard(card) {
   const n = cardTypeLabel(card).toLowerCase();
   return n === "now screening" || n === "playing";
@@ -1674,8 +1687,9 @@ async function warmCachedPosterDeckEarlyIfPossible() {
       loadedSettings.hideSettingsLinks !== undefined
         ? loadedSettings.hideSettingsLinks
         : "false";
-    globalPage.rotate =
-      loadedSettings.rotate !== undefined ? loadedSettings.rotate : "false";
+    const orient = screenOrientationFromSettings();
+    globalPage.rotate = orient.rotate;
+    globalPage.rotateLeft = orient.rotateLeft;
   } catch (e) {
     /* non-fatal: full deck build in loadNowScreening will retry */
   }
@@ -2240,7 +2254,9 @@ async function loadNowScreening() {
   globalPage.hasArt = loadedSettings.hasArt;
   globalPage.quizTime = loadedSettings.triviaTimer !== undefined ? loadedSettings.triviaTimer : 15;
   globalPage.hideSettingsLinks = loadedSettings.hideSettingsLinks !== undefined ? loadedSettings.hideSettingsLinks : 'false';
-  globalPage.rotate = loadedSettings.rotate !== undefined ? loadedSettings.rotate : "false";
+  const orient = screenOrientationFromSettings();
+  globalPage.rotate = orient.rotate;
+  globalPage.rotateLeft = orient.rotateLeft;
 
   // restart the clock
   nowScreeningClock = setInterval(loadNowScreening, instanceTimerJitterMs(pollInterval));
@@ -3954,6 +3970,14 @@ app.get(BASEURL + "/now-showing", (req, res) => {
         : "false",
     viewHotkeysContext: cycleEmbed ? "embed-now-showing" : "now-showing-page",
     hideSettingsLinks: hideSettingsLinks ? "true" : "false",
+    rotate:
+      loadedSettings && loadedSettings.rotate !== undefined
+        ? loadedSettings.rotate
+        : "false",
+    rotateLeft:
+      loadedSettings && loadedSettings.rotateLeft !== undefined
+        ? loadedSettings.rotateLeft
+        : "false",
     ...newFeaturesBannerViewData(),
   });
 });
@@ -4006,6 +4030,14 @@ app.get(BASEURL + "/ads", (req, res) => {
         : "false",
     viewHotkeysContext: adsCycleEmbed ? "embed-ads" : "ads-page",
     hideSettingsLinks: hideSettingsLinks ? "true" : "false",
+    rotate:
+      loadedSettings && loadedSettings.rotate !== undefined
+        ? loadedSettings.rotate
+        : "false",
+    rotateLeft:
+      loadedSettings && loadedSettings.rotateLeft !== undefined
+        ? loadedSettings.rotateLeft
+        : "false",
     ...newFeaturesBannerViewData(),
   });
 });
@@ -6831,6 +6863,7 @@ app.post(
       enableLinks: req.body.enableLinks,
       links: req.body.links,
       rotate: req.body.rotate,
+      rotateLeft: req.body.rotateLeft ? "true" : "false",
       excludeLibs: req.body.excludeLibs,
       saved: false
     };

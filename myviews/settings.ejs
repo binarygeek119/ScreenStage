@@ -452,9 +452,31 @@
                       <input type="checkbox" class="custom-control-input" name="rotate" id="rotate" aria-describedby="rotateHelp"
                         value="true" <% if(typeof formData !== 'undefined' && errors){%><%=formData.rotate ? 'checked' : '' %><%}else{%><%=(settings.rotate == 'true') ? 'checked' : '' %><%}%>>
                       <label class="custom-control-label" for="rotate">Rotate screen</label>
-                      <small id="themeHelp" class="form-text text-muted">Rotate screen orientation -90 degrees (ideal for Amazon Firestick devices)</small>
+                      <small id="rotateHelp" class="form-text text-muted">Turn the display 90° for portrait-mounted TVs and sticks (clockwise by default).</small>
                     </div>
                   </div>
+                  <div class="form-group mb-0" id="rotateLeftGroup">
+                    <div class="custom-control custom-control-nolabel custom-switch ml-auto">
+                      <input type="checkbox" class="custom-control-input" name="rotateLeft" id="rotateLeft" aria-describedby="rotateLeftHelp"
+                        value="true" <% if(typeof formData !== 'undefined' && errors){%><%=formData.rotateLeft ? 'checked' : '' %><%}else{%><%=(settings.rotateLeft == 'true') ? 'checked' : '' %><%}%>>
+                      <label class="custom-control-label" for="rotateLeft">Rotate left (counter-clockwise)</label>
+                      <small id="rotateLeftHelp" class="form-text text-muted">Use when the default clockwise rotation is upside-down on your mount. Applies to posters, now showing, and ads.</small>
+                    </div>
+                  </div>
+                  <script>
+                    (function () {
+                      var rotateEl = document.getElementById("rotate");
+                      var rotateLeftEl = document.getElementById("rotateLeft");
+                      var rotateLeftGroup = document.getElementById("rotateLeftGroup");
+                      function syncRotateLeftEnabled() {
+                        var on = rotateEl && rotateEl.checked;
+                        if (rotateLeftEl) rotateLeftEl.disabled = !on;
+                        if (rotateLeftGroup) rotateLeftGroup.style.opacity = on ? "1" : "0.45";
+                      }
+                      if (rotateEl) rotateEl.addEventListener("change", syncRotateLeftEnabled);
+                      syncRotateLeftEnabled();
+                    })();
+                  </script>
                   <div class="form-group">
                     <div class="custom-control custom-control-nolabel custom-switch ml-auto">
                       <input type="checkbox" class="custom-control-input" name="enableViewHotkeys" id="enableViewHotkeys" aria-describedby="enableViewHotkeysHelp"

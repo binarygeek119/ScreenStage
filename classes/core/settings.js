@@ -152,6 +152,7 @@ class Settings {
     this.enableLinks = DEFAULT_SETTINGS.enableLinks;
     this.links = DEFAULT_SETTINGS.links;
     this.rotate = DEFAULT_SETTINGS.rotate;
+    this.rotateLeft = DEFAULT_SETTINGS.rotateLeft;
     this.excludeLibs = DEFAULT_SETTINGS.excludeLibs;
     this.posterCacheRefreshMins = DEFAULT_SETTINGS.posterCacheRefreshMins;
     this.posterCacheMinAgeBeforeChangeCheckMins =
@@ -311,6 +312,7 @@ class Settings {
       if(readSettings.recentlyAddedDays==undefined) readSettings.recentlyAddedDays = 0;
       if(readSettings.enableAwtrix==undefined) readSettings.enableAwtrix = 'false';
       if(readSettings.rotate==undefined) readSettings.rotate = 'false';
+      if(readSettings.rotateLeft==undefined) readSettings.rotateLeft = 'false';
       if(readSettings.mediaServerType==undefined) readSettings.mediaServerType = 'plex';
       if(readSettings.bookArrKind==undefined) readSettings.bookArrKind = 'readarr';
       if(readSettings.showCast==undefined) readSettings.showCast = 'false';
@@ -1070,6 +1072,10 @@ class Settings {
     else this.awtrixIP = cs.awtrixIP;
     if (jsonObject.rotate) this.rotate = jsonObject.rotate;
     else this.rotate = cs.rotate;
+    this.rotateLeft = toSettingsBoolStr(
+      jsonObject.rotateLeft,
+      cs.rotateLeft ?? DEFAULT_SETTINGS.rotateLeft
+    );
     if (jsonObject.excludeLibs) this.excludeLibs = jsonObject.excludeLibs;
     else this.excludeLibs = cs.excludeLibs;
     if (

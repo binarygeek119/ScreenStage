@@ -9,6 +9,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="<%=baseUrl%>/css/light.min.css">
   <link rel="stylesheet" href="<%=baseUrl%>/css/styles.css">
+  <%- include('rotate-screen.ejs', { rotate: typeof rotate !== 'undefined' ? rotate : 'false', rotateLeft: typeof rotateLeft !== 'undefined' ? rotateLeft : 'false' }) %>
   <style>
     /**
      * Poster-style scaling: root em blends vmin (shorter edge) and vw so type and

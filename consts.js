@@ -163,6 +163,10 @@ const DEFAULT_SETTINGS = {
   awtrixIP: "",
   enableLinks: "false",
   links: "",
+  /** Rotate display for portrait-mounted screens (Firestick, etc.). */
+  rotate: "false",
+  /** When rotate is on: true = counter-clockwise (left), false = clockwise (right, default). */
+  rotateLeft: "false",
   excludeLibs: "",
   /** Minutes between poster DB/cache refresh checks; 0 = disabled. Stale entries re-download from stored URL or are dropped. */
   posterCacheRefreshMins: 0,

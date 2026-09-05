@@ -1,0 +1,29 @@
+<% if (rotate === "true") { %>
+  <% if (rotateLeft === "true") { %>
+  <style>
+    html {
+      transform: rotate(-90deg) !important;
+      transform-origin: left top !important;
+      width: 100vh !important;
+      height: 100vw !important;
+      overflow-x: hidden !important;
+      position: absolute !important;
+      top: 100% !important;
+      left: 0 !important;
+    }
+  </style>
+  <% } else { %>
+  <style>
+    html {
+      transform: rotate(90deg) !important;
+      transform-origin: left top !important;
+      width: 100vh !important;
+      height: 100vw !important;
+      overflow-x: hidden !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 100% !important;
+    }
+  </style>
+  <% } %>
+<% } %>

@@ -33,6 +33,18 @@ function plexClearLogoPathFromMetadata(md) {
   return "";
 }
 
+/** Build a fetch URL for a Plex asset path or pass through absolute CDN URLs unchanged. */
+function plexAssetUrl(self, relPath) {
+  if (!relPath || typeof relPath !== "string") return "";
+  const p = relPath.trim();
+  if (!p) return "";
+  if (/^https?:\/\//i.test(p)) return p;
+  const pre =
+    self.https === true || self.https === "true" ? "https://" : "http://";
+  const sep = p.includes("?") ? "&" : "?";
+  return `${pre}${self.plexIP}:${self.plexPort}${p}${sep}X-Plex-Token=${self.plexToken}`;
+}
+
 /**
  * Download Plex clear logo into imagecache as `{idForFile}-logo.png`.
  */
@@ -41,14 +53,8 @@ async function plexCacheClearLogo(core, self, md, idForFile, medCard) {
   if (!rel || !idForFile) return;
   const logoFile = `${idForFile}-logo.png`;
   try {
-    let fetchUrl;
-    if (/^https?:\/\//i.test(rel)) {
-      fetchUrl = rel;
-    } else {
-      const pre = self.https ? "https://" : "http://";
-      const sep = rel.includes("?") ? "&" : "?";
-      fetchUrl = `${pre}${self.plexIP}:${self.plexPort}${rel}${sep}X-Plex-Token=${self.plexToken}`;
-    }
+    const fetchUrl = plexAssetUrl(self, rel);
+    if (!fetchUrl) return;
     await core.CacheImage(fetchUrl, logoFile);
     medCard.posterLogoURL = "/imagecache/" + logoFile;
   } catch (e) {
@@ -191,10 +197,7 @@ class Plex {
 
             // download poster image to local server
             let guid = md.key.split("/")[3];
-            fileName = guid + result[3] + ".jpg";
-            prefix = "http://";
-            if (this.https) prefix = "https://";
-            let thumb = "";
+            fileName = guid + result[3] + ".jpg";            let thumb = "";
 
             thumb = guid;
             if(md.parentThumb){
@@ -204,13 +207,7 @@ class Plex {
               thumb = md.grandparentThumb;
             }
             url =
-              prefix +
-              this.plexIP +
-              ":" +
-              this.plexPort +
-              thumb +
-              "?X-Plex-Token=" +
-              this.plexToken;
+              this._plexAssetUrl(thumb);
             medCard.posterDownloadURL = url;
             await core.CacheImage(url, fileName);
             medCard.posterURL = "/imagecache/" + fileName;
@@ -219,44 +216,20 @@ class Plex {
             // check art exists
             if (md.grandparentArt !== undefined && hasArt == "true") {
               fileName = guid + result[3] + "-art.jpg";
-              prefix = "http://";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.grandparentArt +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              prefix = "http://";              url =
+                this._plexAssetUrl(md.grandparentArt);
               await core.CacheImage(url, fileName);
               medCard.posterArtURL = "/imagecache/" + fileName;
             } else if (md.parentArt !== undefined && hasArt == "true") {
               fileName = guid + result[3] + "-art.jpg";
-              prefix = "http://";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.parentArt +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              prefix = "http://";              url =
+                this._plexAssetUrl(md.parentArt);
               await core.CacheImage(url, fileName);
               medCard.posterArtURL = "/imagecache/" + fileName;
             } else if (md.art !== undefined && hasArt == "true") {
               fileName = guid + result[3] + "-art.jpg";
-              prefix = "http://";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.art +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              prefix = "http://";              url =
+                this._plexAssetUrl(md.art);
               await core.CacheImage(url, fileName);
               medCard.posterArtURL = "/imagecache/" + fileName;
             }
@@ -294,16 +267,8 @@ class Plex {
             if (playThemes == "true") {
               // download mp3 file to local server
               fileName = mediaId + ".mp3";
-              prefix = "http://";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.grandparentTheme +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              prefix = "http://";              url =
+                this._plexAssetUrl(md.grandparentTheme);
               await core.CachePlexMP3(url, fileName);
               medCard.theme = "/mp3cache/" + fileName;
             }
@@ -316,16 +281,8 @@ class Plex {
 
             // download poster image to local server
             fileName = mediaId + ".jpg";
-            prefix = "http://";
-            if (this.https) prefix = "https://";
-            url =
-              prefix +
-              this.plexIP +
-              ":" +
-              this.plexPort +
-              md.grandparentThumb +
-              "?X-Plex-Token=" +
-              this.plexToken;
+            prefix = "http://";            url =
+              this._plexAssetUrl(md.grandparentThumb);
             medCard.posterDownloadURL = url;
             await core.CacheImage(url, fileName);
             medCard.posterURL = "/imagecache/" + fileName;
@@ -333,16 +290,8 @@ class Plex {
             //download poster
             // check art exists
             if (md.art !== undefined && hasArt == "true") {
-              fileName = mediaId + "-art.jpg";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.art +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              fileName = mediaId + "-art.jpg";              url =
+                this._plexAssetUrl(md.art);
 
               await core.CacheImage(url, fileName);
               medCard.posterArtURL = "/imagecache/" + fileName;
@@ -397,17 +346,8 @@ class Plex {
           case "movie":
             // cache movie poster
             let movieFileName = md.ratingKey + ".jpg";
-            medCard.genre = md.Genre;
-            let moviePlexPrefix = "http://";
-            if (this.https) moviePlexPrefix = "https://";
-            let movieUrl =
-              moviePlexPrefix +
-              this.plexIP +
-              ":" +
-              this.plexPort +
-              md.thumb +
-              "?X-Plex-Token=" +
-              this.plexToken;
+            medCard.genre = md.Genre;            let movieUrl =
+              this._plexAssetUrl(md.thumb);
             medCard.posterDownloadURL = movieUrl;
             await core.CacheImage(movieUrl, movieFileName);
             medCard.posterURL = "/imagecache/" + movieFileName;
@@ -415,16 +355,8 @@ class Plex {
             //download poster
             // check art exists
             if (md.art !== undefined && hasArt == "true") {
-              movieFileName = md.ratingKey + "-art.jpg";
-              if (this.https) moviePlexPrefix = "https://";
-              movieUrl =
-                moviePlexPrefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.art +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              movieFileName = md.ratingKey + "-art.jpg";              movieUrl =
+                this._plexAssetUrl(md.art);
 
               await core.CacheImage(movieUrl, movieFileName);
               medCard.posterArtURL = "/imagecache/" + movieFileName;
@@ -438,16 +370,8 @@ class Plex {
               else{
                 // download mp3 file to local server
                 fileName = md.ratingKey + ".mp3";
-              prefix = "http://";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.theme +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              prefix = "http://";              url =
+                this._plexAssetUrl(md.theme);
               await core.CachePlexMP3(url, fileName);
               medCard.theme = "/mp3cache/" + fileName;
               }
@@ -898,17 +822,8 @@ class Plex {
             medCard.theme = "";
             if (effPlayThemes == "true" &&  !(await util.isEmpty(md.theme))) {
               // download mp3 from plex tv theme server
-              let fileName = mediaId + ".mp3";
-              let prefix = "http://";
-              if (this.https) prefix = "https://";
-              let url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.theme +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              let fileName = mediaId + ".mp3";              let url =
+                this._plexAssetUrl(md.theme);
               await core.CachePlexMP3(url, fileName);
               medCard.theme = "/mp3cache/" + fileName;
             }
@@ -919,18 +834,8 @@ class Plex {
             }
 
             // download poster image from plex server
-            let fileName = mediaId + ".jpg";
-
-            let prefix = "http://";
-            if (this.https) prefix = "https://";
-            let url =
-              prefix +
-              this.plexIP +
-              ":" +
-              this.plexPort +
-              md.thumb +
-              "?X-Plex-Token=" +
-              this.plexToken;
+            let fileName = mediaId + ".jpg";            let url =
+              this._plexAssetUrl(md.thumb);
 
             if (pullVideoPoster && md.thumb) {
               medCard.posterDownloadURL = url;
@@ -946,16 +851,8 @@ class Plex {
             //download poster art + optional Plex banner (wide)
             let showHasBackdrop = false;
             if (md.art !== undefined && pullBackground) {
-              fileName = mediaId + "-art.jpg";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.art +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              fileName = mediaId + "-art.jpg";              url =
+                this._plexAssetUrl(md.art);
 
               await core.CacheImage(url, fileName);
               medCard.posterArtURL = "/imagecache/" + fileName;
@@ -963,16 +860,8 @@ class Plex {
             }
             let showServerBannerOk = false;
             if (pullBackground && md.banner) {
-              fileName = mediaId + "-banner.jpg";
-              if (this.https) prefix = "https://";
-              url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.banner +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              fileName = mediaId + "-banner.jpg";              url =
+                this._plexAssetUrl(md.banner);
               try {
                 await core.CacheImage(url, fileName);
                 showServerBannerOk = true;
@@ -1008,17 +897,8 @@ class Plex {
           case "movie":
             // cache movie poster
             //     console.log(md);
-            let movieFileName = md.ratingKey + ".jpg";
-            let moviePlexPrefix = "http://";
-            if (this.https) moviePlexPrefix = "https://";
-            let movieUrl =
-              moviePlexPrefix +
-              this.plexIP +
-              ":" +
-              this.plexPort +
-              md.thumb +
-              "?X-Plex-Token=" +
-              this.plexToken;
+            let movieFileName = md.ratingKey + ".jpg";            let movieUrl =
+              this._plexAssetUrl(md.thumb);
             if (pullVideoPoster && md.thumb) {
               medCard.posterDownloadURL = movieUrl;
               await core.CacheImage(movieUrl, movieFileName);
@@ -1033,16 +913,8 @@ class Plex {
             //download poster art + optional Plex banner (wide)
             let movieHasBackdrop = false;
             if (md.art !== undefined && pullBackground) {
-              movieFileName = md.ratingKey + "-art.jpg";
-              if (this.https) moviePlexPrefix = "https://";
-              movieUrl =
-                moviePlexPrefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.art +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              movieFileName = md.ratingKey + "-art.jpg";              movieUrl =
+                this._plexAssetUrl(md.art);
 
               await core.CacheImage(movieUrl, movieFileName);
               medCard.posterArtURL = "/imagecache/" + movieFileName;
@@ -1050,16 +922,8 @@ class Plex {
             }
             let movieServerBannerOk = false;
             if (pullBackground && md.banner) {
-              movieFileName = md.ratingKey + "-banner.jpg";
-              if (this.https) moviePlexPrefix = "https://";
-              movieUrl =
-                moviePlexPrefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.banner +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              movieFileName = md.ratingKey + "-banner.jpg";              movieUrl =
+                this._plexAssetUrl(md.banner);
               try {
                 await core.CacheImage(movieUrl, movieFileName);
                 movieServerBannerOk = true;
@@ -1096,17 +960,8 @@ class Plex {
               }
               else{
                 // download mp3 file to local server
-                themeFile = md.ratingKey + ".mp3";
-              let prefix = "http://";
-              if (this.https) prefix = "https://";
-              let url =
-                prefix +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.theme +
-                "?X-Plex-Token=" +
-                this.plexToken;
+                themeFile = md.ratingKey + ".mp3";              let url =
+                this._plexAssetUrl(md.theme);
               await core.CachePlexMP3(url, themeFile);
               medCard.theme = "/mp3cache/" + themeFile;
               }
@@ -1142,17 +997,8 @@ class Plex {
             break;
           case "album":
             {
-              let albPoster = md.ratingKey + ".jpg";
-              let albPre = "http://";
-              if (this.https) albPre = "https://";
-              let albImgUrl =
-                albPre +
-                this.plexIP +
-                ":" +
-                this.plexPort +
-                md.thumb +
-                "?X-Plex-Token=" +
-                this.plexToken;
+              let albPoster = md.ratingKey + ".jpg";              let albImgUrl =
+                this._plexAssetUrl(md.thumb);
               if (pullAlbumPoster && md.thumb) {
                 medCard.posterDownloadURL = albImgUrl;
                 await core.CacheImage(albImgUrl, albPoster);
@@ -1167,26 +1013,14 @@ class Plex {
               if (md.art !== undefined && pullBackground) {
                 let albArtFile = md.ratingKey + "-art.jpg";
                 let albArtUrl =
-                  albPre +
-                  this.plexIP +
-                  ":" +
-                  this.plexPort +
-                  md.art +
-                  "?X-Plex-Token=" +
-                  this.plexToken;
+                  this._plexAssetUrl(md.art);
                 await core.CacheImage(albArtUrl, albArtFile);
                 medCard.posterArtURL = "/imagecache/" + albArtFile;
                 albHasBackdrop = true;
               } else if (md.grandparentArt !== undefined && pullBackground) {
                 let albArtFile = md.ratingKey + "-art.jpg";
                 let albArtUrl =
-                  albPre +
-                  this.plexIP +
-                  ":" +
-                  this.plexPort +
-                  md.grandparentArt +
-                  "?X-Plex-Token=" +
-                  this.plexToken;
+                  this._plexAssetUrl(md.grandparentArt);
                 await core.CacheImage(albArtUrl, albArtFile);
                 medCard.posterArtURL = "/imagecache/" + albArtFile;
                 albHasBackdrop = true;
@@ -1194,13 +1028,7 @@ class Plex {
               if (pullBackground && md.banner) {
                 let albBnFile = md.ratingKey + "-banner.jpg";
                 let albBnUrl =
-                  albPre +
-                  this.plexIP +
-                  ":" +
-                  this.plexPort +
-                  md.banner +
-                  "?X-Plex-Token=" +
-                  this.plexToken;
+                  this._plexAssetUrl(md.banner);
                 try {
                   await core.CacheImage(albBnUrl, albBnFile);
                   if (!albHasBackdrop) {
@@ -1644,19 +1472,12 @@ class Plex {
     return odSet;
   }
 
+  _plexAssetUrl(relPath) {
+    return plexAssetUrl(this, relPath);
+  }
+
   _plexThumbToUrl(relPath) {
-    if (!relPath || typeof relPath !== "string") return "";
-    const prefix =
-      this.https === true || this.https === "true" ? "https://" : "http://";
-    return (
-      prefix +
-      this.plexIP +
-      ":" +
-      this.plexPort +
-      relPath +
-      "?X-Plex-Token=" +
-      this.plexToken
-    );
+    return this._plexAssetUrl(relPath);
   }
 
   async _cachePlexThumb(relPath, cacheFileName) {
