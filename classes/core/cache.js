@@ -5,6 +5,15 @@ const fsExtra = require("fs-extra");
 const util = require("./utility");
 const { IMAGE_CACHE_DIR, MP3_CACHE_DIR } = require("./appPaths");
 
+/** Recover from legacy Plex URL concat bugs (host:port glued to absolute https://…). */
+function normalizeDownloadUrl(url) {
+  const s = String(url || "").trim();
+  if (!s) return s;
+  const glued = s.match(/^(https?:\/\/[^/]+:\d+)(https?:\/\/.+)$/i);
+  if (glued) return glued[2];
+  return s;
+}
+
 /**
  * @desc Cache class manages the downloaad, cleanup and random selection of mp3 and poster image assets. Methods are static.
  * @returns nothing
@@ -45,7 +54,7 @@ class Cache {
    * @param {string} savePath absolute or relative path
    */
   static downloadImageForce(url, savePath, options) {
-    const cleanUrl = String(url || "").trim();
+    const cleanUrl = normalizeDownloadUrl(String(url || "").trim());
     if (!cleanUrl || cleanUrl.includes("undefined") || cleanUrl.includes("null")) {
       return Promise.resolve(false);
     }
@@ -105,7 +114,7 @@ class Cache {
    * @returns {Promise<boolean>}
    */
   static download(url, savePath, options) {
-    const cleanUrl = String(url || "").trim();
+    const cleanUrl = normalizeDownloadUrl(String(url || "").trim());
     if (!cleanUrl || cleanUrl.includes("undefined") || cleanUrl.includes("null")) {
       return Promise.resolve(false);
     }
